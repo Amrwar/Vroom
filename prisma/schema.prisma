@@ -20,27 +20,29 @@ model Worker {
 }
 
 model WashRecord {
-  id             String    @id @default(uuid())
-  plateNumber    String
-  carType        String?
-  washType       WashType
-  entryTime      DateTime  @default(now())
-  finishTime     DateTime?
-  elapsedMinutes Int?
-  paymentType    PaymentType?
-  amountPaid     Float     @default(0)
-  tipAmount      Float     @default(0)
-  notes          String?
-  status         Status    @default(IN_PROGRESS)
-  workerId       String?
-  worker         Worker?   @relation(fields: [workerId], references: [id])
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String       @id @default(uuid())
+  plateNumber     String
+  carType         String?
+  washType        WashType
+  entryTime       DateTime     @default(now())
+  finishTime      DateTime?
+  elapsedMinutes  Int?
+  paymentType     PaymentType?
+  amountPaid      Float        @default(0)
+  tipAmount       Float        @default(0)
+  paymentReceived Boolean      @default(false)
+  notes           String?
+  status          Status       @default(IN_PROGRESS)
+  workerId        String?
+  worker          Worker?      @relation(fields: [workerId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   @@index([entryTime])
   @@index([plateNumber])
   @@index([status])
   @@index([workerId])
+  @@index([paymentReceived])
 }
 
 enum WashType {

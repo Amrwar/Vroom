@@ -1,142 +1,163 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { WashRecordWithWorker, Worker, DashboardStats, FilterParams } from '@/types';
-import { formatCairoDate } from '@/lib/date-utils';
-import StatsCard from '@/components/StatsCard';
-import WashRecordsTable from '@/components/WashRecordsTable';
-import AddCarModal from '@/components/AddCarModal';
-import EditCarModal from '@/components/EditCarModal';
-import FinishModal from '@/components/FinishModal';
-import DeleteConfirmModal from '@/components/DeleteConfirmModal';
-import {
-  Car,
-  Clock,
-  CheckCircle,
-  DollarSign,
-  Gift,
-  Banknote,
-  Smartphone,
-  Plus,
-  Download,
-  RefreshCw,
-} from 'lucide-react';
+import { useState, useEffect, useCallback } from "react";
+import { WashRecord, Worker } from "@prisma/client";
+import AddCarModal from "@/components/AddCarModal";
+import EditCarModal from "@/components/EditCarModal";
+import FinishModal from "@/components/FinishModal";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import WashRecordsTable from "@/components/WashRecordsTable";
+import StatsCard from "@/components/StatsCard";
+import { Plus, RefreshCw, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign } from "lucide-react";
+
+type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
 export default function DashboardPage() {
   const [records, setRecords] = useState<WashRecordWithWorker[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filters, setFilters] = useState<FilterParams>({});
-
-  // Modals
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editRecord, setEditRecord] = useState<WashRecordWithWorker | null>(null);
-  const [finishRecord, setFinishRecord] = useState<WashRecordWithWorker | null>(null);
-  const [deleteRecord, setDeleteRecord] = useState<WashRecordWithWorker | null>(null);
+  const [editingRecord, setEditingRecord] = useState<WashRecordWithWorker | null>(null);
+  const [finishingRecord, setFinishingRecord] = useState<WashRecordWithWorker | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
-  const today = formatCairoDate(new Date());
+  const today = new Date().toISOString().split("T")[0];
 
-  const fetchRecords = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const response = await fetch(`/api/wash-records?date=${today}`);
-      const data = await response.json();
-      if (data.success) {
-        setRecords(data.data);
-      }
+      const [recordsRes, workersRes] = await Promise.all([
+        fetch(`/api/wash-records?date=${today}`),
+        fetch("/api/workers"),
+      ]);
+
+      const recordsData = await recordsRes.json();
+      const workersData = await workersRes.json();
+
+      if (recordsData.success) setRecords(recordsData.data);
+      if (workersData.success) setWorkers(workersData.data);
     } catch (error) {
-      console.error('Failed to fetch records:', error);
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setLoading(false);
     }
   }, [today]);
 
-  const fetchWorkers = useCallback(async () => {
-    try {
-      const response = await fetch('/api/workers');
-      const data = await response.json();
-      if (data.success) {
-        setWorkers(data.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch workers:', error);
-    }
-  }, []);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    await Promise.all([fetchRecords(), fetchWorkers()]);
-    setLoading(false);
-  }, [fetchRecords, fetchWorkers]);
-
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchRecords();
-    setRefreshing(false);
-  };
+    fetchData();
+  }, [fetchData]);
 
   const handleAddWorker = async (name: string): Promise<Worker> => {
-    const response = await fetch('/api/workers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/api/workers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
     const data = await response.json();
     if (data.success) {
-      setWorkers([...workers, data.data]);
+      setWorkers((prev) => [...prev, data.data]);
       return data.data;
     }
-    throw new Error(data.error || 'Failed to add worker');
+    throw new Error(data.error);
   };
 
-  const handleExportDaily = () => {
-    window.open(`/api/export/daily?date=${today}`, '_blank');
+  const handleFinish = async (id: string) => {
+    const record = records.find((r) => r.id === id);
+    if (record) setFinishingRecord(record);
   };
 
-  // Calculate stats
-  const stats: DashboardStats = {
-    totalCars: records.length,
-    inProgress: records.filter((r) => r.status === 'IN_PROGRESS').length,
-    finished: records.filter((r) => r.status === 'FINISHED').length,
-    totalRevenue: records.reduce((sum, r) => sum + r.amountPaid, 0),
-    totalTips: records.reduce((sum, r) => sum + r.tipAmount, 0),
-    totalCash: records.filter((r) => r.paymentType === 'CASH').reduce((sum, r) => sum + r.amountPaid, 0),
-    totalInstapay: records.filter((r) => r.paymentType === 'INSTAPAY').reduce((sum, r) => sum + r.amountPaid, 0),
+  const confirmFinish = async (paymentType?: string, amountPaid?: number, tipAmount?: number) => {
+    if (!finishingRecord) return;
+
+    try {
+      const response = await fetch(`/api/wash-records/${finishingRecord.id}/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentType, amountPaid, tipAmount }),
+      });
+
+      if (response.ok) {
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Failed to finish record:", error);
+    } finally {
+      setFinishingRecord(null);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-primary-500 animate-spin mx-auto mb-3" />
-          <p className="text-gray-500">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleDelete = async () => {
+    if (!deletingId) return;
+
+    try {
+      const response = await fetch(`/api/wash-records/${deletingId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Failed to delete record:", error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleTogglePayment = async (id: string, received: boolean) => {
+    try {
+      const response = await fetch(`/api/wash-records/${id}/payment`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentReceived: received }),
+      });
+
+      if (response.ok) {
+        setRecords((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, paymentReceived: received } : r))
+        );
+      }
+    } catch (error) {
+      console.error("Failed to toggle payment:", error);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await fetch(`/api/export/daily?date=${today}`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `carwash-${today}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export:", error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const stats = {
+    total: records.length,
+    inProgress: records.filter((r) => r.status === "IN_PROGRESS").length,
+    finished: records.filter((r) => r.status === "FINISHED").length,
+    revenue: records.reduce((sum, r) => sum + r.amountPaid, 0),
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Today&apos;s Dashboard</h1>
-          <p className="text-gray-500">{formatCairoDate(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+          <h1 className="text-2xl font-bold text-gray-900">Today's Dashboard</h1>
+          <p className="text-gray-500">{new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="btn btn-secondary"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-          <button onClick={handleExportDaily} className="btn btn-secondary">
-            <Download className="w-4 h-4" />
-            Export
+        <div className="flex gap-2">
+          <button onClick={handleExport} disabled={exporting} className="btn btn-secondary">
+            <FileSpreadsheet className="w-4 h-4" />
+            {exporting ? "Exporting..." : "Export"}
           </button>
           <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
             <Plus className="w-4 h-4" />
@@ -145,69 +166,53 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        <StatsCard title="Total Cars" value={stats.totalCars} icon={Car} color="blue" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatsCard title="Total Cars" value={stats.total} icon={Car} color="blue" />
         <StatsCard title="In Progress" value={stats.inProgress} icon={Clock} color="yellow" />
         <StatsCard title="Finished" value={stats.finished} icon={CheckCircle} color="green" />
-        <StatsCard
-          title="Revenue"
-          value={`${stats.totalRevenue} EGP`}
-          icon={DollarSign}
-          color="purple"
-        />
-        <StatsCard title="Tips" value={`${stats.totalTips} EGP`} icon={Gift} color="green" />
-        <StatsCard title="Cash" value={`${stats.totalCash} EGP`} icon={Banknote} color="gray" />
-        <StatsCard
-          title="InstaPay"
-          value={`${stats.totalInstapay} EGP`}
-          icon={Smartphone}
-          color="blue"
-        />
+        <StatsCard title="Revenue" value={`${stats.revenue} EGP`} icon={DollarSign} color="purple" />
       </div>
 
-      {/* Records Table */}
-      <div className="card p-5">
-        <WashRecordsTable
-          records={records}
-          workers={workers}
-          filters={filters}
-          onFiltersChange={setFilters}
-          onFinish={setFinishRecord}
-          onEdit={setEditRecord}
-          onDelete={setDeleteRecord}
-        />
-      </div>
+      <WashRecordsTable
+        records={records}
+        onFinish={handleFinish}
+        onEdit={setEditingRecord}
+        onDelete={setDeletingId}
+        onTogglePayment={handleTogglePayment}
+        loading={loading}
+      />
 
-      {/* Modals */}
       <AddCarModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onSuccess={fetchRecords}
+        onSuccess={fetchData}
         workers={workers}
         onAddWorker={handleAddWorker}
       />
 
-      <EditCarModal
-        isOpen={!!editRecord}
-        onClose={() => setEditRecord(null)}
-        onSuccess={fetchRecords}
-        record={editRecord}
-        workers={workers}
-      />
+      {editingRecord && (
+        <EditCarModal
+          isOpen={!!editingRecord}
+          onClose={() => setEditingRecord(null)}
+          onSuccess={fetchData}
+          record={editingRecord}
+          workers={workers}
+        />
+      )}
 
-      <FinishModal
-        isOpen={!!finishRecord}
-        onClose={() => setFinishRecord(null)}
-        onSuccess={fetchRecords}
-        record={finishRecord}
-      />
+      {finishingRecord && (
+        <FinishModal
+          isOpen={!!finishingRecord}
+          onClose={() => setFinishingRecord(null)}
+          onConfirm={confirmFinish}
+          record={finishingRecord}
+        />
+      )}
 
       <DeleteConfirmModal
-        isOpen={!!deleteRecord}
-        onClose={() => setDeleteRecord(null)}
-        onSuccess={fetchRecords}
-        record={deleteRecord}
+        isOpen={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        onConfirm={handleDelete}
       />
     </div>
   );
