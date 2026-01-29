@@ -8,7 +8,7 @@ import FinishModal from "@/components/FinishModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import WashRecordsTable from "@/components/WashRecordsTable";
 import StatsCard from "@/components/StatsCard";
-import { Plus, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { Plus, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign, ChevronLeft, ChevronRight, Calendar, Banknote, CreditCard } from "lucide-react";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
@@ -129,6 +129,12 @@ export default function DashboardPage() {
     inProgress: records.filter((r) => r.status === "IN_PROGRESS").length,
     finished: records.filter((r) => r.status === "FINISHED").length,
     revenue: records.reduce((sum, r) => sum + r.amountPaid, 0),
+    cashReceived: records
+      .filter((r) => r.paymentType === "CASH" && r.paymentReceived)
+      .reduce((sum, r) => sum + r.amountPaid, 0),
+    instapayReceived: records
+      .filter((r) => r.paymentType === "INSTAPAY" && r.paymentReceived)
+      .reduce((sum, r) => sum + r.amountPaid, 0),
   };
 
   return (
@@ -182,11 +188,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatsCard title="Total Cars" value={stats.total} icon={Car} color="blue" />
         <StatsCard title="In Progress" value={stats.inProgress} icon={Clock} color="yellow" />
         <StatsCard title="Finished" value={stats.finished} icon={CheckCircle} color="green" />
-        <StatsCard title="Revenue" value={`${stats.revenue} EGP`} icon={DollarSign} color="purple" />
+        <StatsCard title="Total Revenue" value={`${stats.revenue} EGP`} icon={DollarSign} color="purple" />
+        <StatsCard title="Cash Received" value={`${stats.cashReceived} EGP`} icon={Banknote} color="green" />
+        <StatsCard title="InstaPay Received" value={`${stats.instapayReceived} EGP`} icon={CreditCard} color="blue" />
       </div>
 
       <WashRecordsTable
