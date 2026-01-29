@@ -1,14 +1,13 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { WashRecordWithWorker, Worker, DashboardStats } from '@/types';
-import { formatCairoDate, formatCairoTime } from '@/lib/date-utils';
-import StatsCard from '@/components/StatsCard';
+import { useState, useEffect, useCallback } from "react";
+import { WashRecord, Worker } from "@prisma/client";
+import StatsCard from "@/components/StatsCard";
 import {
   Car,
   CheckCircle,
   DollarSign,
-  Gift,
+  CreditCard,
   Banknote,
   Smartphone,
   Download,
@@ -17,21 +16,39 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-} from 'lucide-react';
-import clsx from 'clsx';
+  TrendingUp,
+} from "lucide-react";
+import clsx from "clsx";
+
+type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
 const washTypeBadges: Record<string, string> = {
-  INNER: 'badge-blue',
-  OUTER: 'badge-green',
-  FULL: 'badge-purple',
-  FREE: 'badge-gray',
+  INNER: "badge-blue",
+  OUTER: "badge-green",
+  FULL: "badge-purple",
+  FREE: "badge-gray",
+};
+
+const formatDate = (date: Date | string, format: string) => {
+  const d = new Date(date);
+  if (format === "yyyy-MM") {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  if (format === "MMM d") {
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  return d.toLocaleDateString();
+};
+
+const formatTime = (date: Date | string) => {
+  return new Date(date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 };
 
 export default function ReportsPage() {
   const [records, setRecords] = useState<WashRecordWithWorker[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(() => formatCairoDate(new Date(), 'yyyy-MM'));
+  const [selectedMonth, setSelectedMonth] = useState(() => formatDate(new Date(), "yyyy-MM"));
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
@@ -42,7 +59,7 @@ export default function ReportsPage() {
         setRecords(data.data);
       }
     } catch (error) {
-      console.error('Failed to fetch records:', error);
+      console.error("Failed to fetch records:", error);
     } finally {
       setLoading(false);
     }
@@ -50,13 +67,13 @@ export default function ReportsPage() {
 
   const fetchWorkers = useCallback(async () => {
     try {
-      const response = await fetch('/api/workers');
+      const response = await fetch("/api/workers");
       const data = await response.json();
       if (data.success) {
         setWorkers(data.data);
       }
     } catch (error) {
-      console.error('Failed to fetch workers:', error);
+      console.error("Failed to fetch workers:", error);
     }
   }, []);
 
@@ -68,28 +85,36 @@ export default function ReportsPage() {
   const handlePreviousMonth = () => {
     const date = new Date(`${selectedMonth}-01`);
     date.setMonth(date.getMonth() - 1);
-    setSelectedMonth(formatCairoDate(date, 'yyyy-MM'));
+    setSelectedMonth(formatDate(date, "yyyy-MM"));
   };
 
   const handleNextMonth = () => {
     const date = new Date(`${selectedMonth}-01`);
     date.setMonth(date.getMonth() + 1);
-    setSelectedMonth(formatCairoDate(date, 'yyyy-MM'));
+    setSelectedMonth(formatDate(date, "yyyy-MM"));
   };
 
   const handleExportMonthly = () => {
-    window.open(`/api/export/monthly?month=${selectedMonth}`, '_blank');
+    window.open(`/api/export/monthly?month=${selectedMonth}`, "_blank");
   };
 
-  // Calculate stats
-  const stats: DashboardStats = {
+  // Calculate stats - only InstaPay tips
+  const instapayTips = records
+    .filter((r) => r.paymentType === "INSTAPAY")
+    .reduce((sum, r) => sum + r.tipAmount, 0);
+
+  const totalRevenue = records.reduce((sum, r) => sum + r.amountPaid, 0);
+  const netRevenue = totalRevenue - instapayTips;
+
+  const stats = {
     totalCars: records.length,
-    inProgress: records.filter((r) => r.status === 'IN_PROGRESS').length,
-    finished: records.filter((r) => r.status === 'FINISHED').length,
-    totalRevenue: records.reduce((sum, r) => sum + r.amountPaid, 0),
-    totalTips: records.reduce((sum, r) => sum + r.tipAmount, 0),
-    totalCash: records.filter((r) => r.paymentType === 'CASH').reduce((sum, r) => sum + r.amountPaid, 0),
-    totalInstapay: records.filter((r) => r.paymentType === 'INSTAPAY').reduce((sum, r) => sum + r.amountPaid, 0),
+    inProgress: records.filter((r) => r.status === "IN_PROGRESS").length,
+    finished: records.filter((r) => r.status === "FINISHED").length,
+    totalRevenue,
+    instapayTips,
+    netRevenue,
+    totalCash: records.filter((r) => r.paymentType === "CASH").reduce((sum, r) => sum + r.amountPaid, 0),
+    totalInstapay: records.filter((r) => r.paymentType === "INSTAPAY").reduce((sum, r) => sum + r.amountPaid, 0),
   };
 
   // Calculate breakdown by wash type
@@ -102,26 +127,27 @@ export default function ReportsPage() {
     return acc;
   }, {} as Record<string, { count: number; revenue: number }>);
 
-  // Calculate breakdown by worker
+  // Calculate breakdown by worker - only InstaPay tips
   const byWorker = records.reduce((acc, r) => {
-    const name = r.worker?.name || 'Unassigned';
+    const name = r.worker?.name || "Unassigned";
     if (!acc[name]) {
-      acc[name] = { count: 0, revenue: 0, tips: 0 };
+      acc[name] = { count: 0, revenue: 0, instapayTips: 0 };
     }
     acc[name].count++;
     acc[name].revenue += r.amountPaid;
-    acc[name].tips += r.tipAmount;
+    if (r.paymentType === "INSTAPAY") {
+      acc[name].instapayTips += r.tipAmount;
+    }
     return acc;
-  }, {} as Record<string, { count: number; revenue: number; tips: number }>);
+  }, {} as Record<string, { count: number; revenue: number; instapayTips: number }>);
 
-  const monthDisplay = new Date(`${selectedMonth}-01`).toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
+  const monthDisplay = new Date(`${selectedMonth}-01`).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
   });
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Monthly Reports</h1>
@@ -133,7 +159,6 @@ export default function ReportsPage() {
         </button>
       </div>
 
-      {/* Month Selector */}
       <div className="card p-4">
         <div className="flex items-center justify-center gap-4">
           <button
@@ -167,20 +192,18 @@ export default function ReportsPage() {
         </div>
       ) : (
         <>
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             <StatsCard title="Total Cars" value={stats.totalCars} icon={Car} color="blue" />
             <StatsCard title="In Progress" value={stats.inProgress} icon={Clock} color="yellow" />
             <StatsCard title="Finished" value={stats.finished} icon={CheckCircle} color="green" />
             <StatsCard title="Revenue" value={`${stats.totalRevenue} EGP`} icon={DollarSign} color="purple" />
-            <StatsCard title="Tips" value={`${stats.totalTips} EGP`} icon={Gift} color="green" />
+            <StatsCard title="InstaPay Tips" value={`${stats.instapayTips} EGP`} icon={CreditCard} color="amber" />
+            <StatsCard title="Net Revenue" value={`${stats.netRevenue} EGP`} icon={TrendingUp} color="green" />
             <StatsCard title="Cash" value={`${stats.totalCash} EGP`} icon={Banknote} color="gray" />
             <StatsCard title="InstaPay" value={`${stats.totalInstapay} EGP`} icon={Smartphone} color="blue" />
           </div>
 
-          {/* Breakdowns */}
           <div className="grid md:grid-cols-2 gap-6">
-            {/* By Wash Type */}
             <div className="card p-5">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">By Wash Type</h3>
               <div className="space-y-3">
@@ -190,7 +213,7 @@ export default function ReportsPage() {
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                   >
                     <div className="flex items-center gap-3">
-                      <span className={clsx('badge', washTypeBadges[type])}>{type}</span>
+                      <span className={clsx("badge", washTypeBadges[type])}>{type}</span>
                       <span className="text-gray-600">{data.count} cars</span>
                     </div>
                     <span className="font-semibold text-gray-900">{data.revenue} EGP</span>
@@ -202,7 +225,6 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* By Worker */}
             <div className="card p-5">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">By Worker</h3>
               <div className="space-y-3">
@@ -216,7 +238,10 @@ export default function ReportsPage() {
                       <div>
                         <p className="font-medium text-gray-900">{name}</p>
                         <p className="text-sm text-gray-500">
-                          {data.count} cars • Tips: {data.tips} EGP
+                          {data.count} cars
+                          {data.instapayTips > 0 && (
+                            <span className="text-amber-600"> ? InstaPay Tips: {data.instapayTips} EGP</span>
+                          )}
                         </p>
                       </div>
                       <span className="font-semibold text-gray-900">{data.revenue} EGP</span>
@@ -229,12 +254,11 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* Records Table */}
           <div className="card p-5">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               All Records ({records.length})
             </h3>
-            <div className="table-container">
+            <div className="overflow-x-auto">
               <table className="table">
                 <thead>
                   <tr>
@@ -246,7 +270,7 @@ export default function ReportsPage() {
                     <th>Duration</th>
                     <th>Payment</th>
                     <th>Amount</th>
-                    <th>Tip</th>
+                    <th>InstaPay Tip</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -261,7 +285,7 @@ export default function ReportsPage() {
                     records.map((record) => (
                       <tr key={record.id}>
                         <td className="text-gray-600">
-                          {formatCairoDate(record.entryTime, 'MMM d')}
+                          {formatDate(record.entryTime, "MMM d")}
                         </td>
                         <td>
                           <span className="font-mono font-semibold text-gray-900">
@@ -269,43 +293,45 @@ export default function ReportsPage() {
                           </span>
                         </td>
                         <td>
-                          <span className={clsx('badge', washTypeBadges[record.washType])}>
+                          <span className={clsx("badge", washTypeBadges[record.washType])}>
                             {record.washType}
                           </span>
                         </td>
-                        <td className="text-gray-700">{record.worker?.name || '-'}</td>
-                        <td className="text-gray-600">{formatCairoTime(record.entryTime)}</td>
+                        <td className="text-gray-700">{record.worker?.name || "-"}</td>
+                        <td className="text-gray-600">{formatTime(record.entryTime)}</td>
                         <td className="text-gray-600">
-                          {record.elapsedMinutes !== null ? `${record.elapsedMinutes} min` : '-'}
+                          {record.elapsedMinutes !== null ? `${record.elapsedMinutes} min` : "-"}
                         </td>
                         <td>
                           {record.paymentType ? (
                             <span
                               className={clsx(
-                                'badge',
-                                record.paymentType === 'CASH' ? 'badge-green' : 'badge-blue'
+                                "badge",
+                                record.paymentType === "CASH" ? "badge-green" : "badge-blue"
                               )}
                             >
                               {record.paymentType}
                             </span>
                           ) : (
-                            '-'
+                            "-"
                           )}
                         </td>
                         <td className="font-medium text-gray-900">
-                          {record.amountPaid > 0 ? `${record.amountPaid} EGP` : '-'}
+                          {record.amountPaid > 0 ? `${record.amountPaid} EGP` : "-"}
                         </td>
-                        <td className="text-emerald-600 font-medium">
-                          {record.tipAmount > 0 ? `${record.tipAmount} EGP` : '-'}
+                        <td className="text-amber-600 font-medium">
+                          {record.paymentType === "INSTAPAY" && record.tipAmount > 0
+                            ? `${record.tipAmount} EGP`
+                            : "-"}
                         </td>
                         <td>
                           <span
                             className={clsx(
-                              'badge',
-                              record.status === 'FINISHED' ? 'badge-green' : 'badge-yellow'
+                              "badge",
+                              record.status === "FINISHED" ? "badge-green" : "badge-yellow"
                             )}
                           >
-                            {record.status === 'FINISHED' ? 'Done' : 'Active'}
+                            {record.status === "FINISHED" ? "Done" : "Active"}
                           </span>
                         </td>
                       </tr>
