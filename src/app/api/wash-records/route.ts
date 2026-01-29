@@ -1,54 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { CreateWashRecordSchema } from '@/lib/validations';
-import { getDateRangeForDay, getDateRangeForMonth, formatCairoDate } from '@/lib/date-utils';
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { CreateWashRecordSchema } from "@/lib/validations";
+import { getCairoDayStart, getCairoDayEnd, getCairoMonthStart, getCairoMonthEnd, formatCairoDate } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date');
-    const month = searchParams.get('month');
+    const date = searchParams.get("date");
+    const month = searchParams.get("month");
 
-    let dateFilter = {};
+    let start: Date;
+    let end: Date;
 
     if (date) {
-      const { start, end } = getDateRangeForDay(date);
-      dateFilter = {
-        entryTime: {
-          gte: start,
-          lte: end,
-        },
-      };
+      const targetDate = new Date(date);
+      start = getCairoDayStart(targetDate);
+      end = getCairoDayEnd(targetDate);
     } else if (month) {
-      const { start, end } = getDateRangeForMonth(month);
-      dateFilter = {
-        entryTime: {
-          gte: start,
-          lte: end,
-        },
-      };
+      const [year, monthNum] = month.split("-").map(Number);
+      const targetDate = new Date(year, monthNum - 1, 1);
+      start = getCairoMonthStart(targetDate);
+      end = getCairoMonthEnd(targetDate);
     } else {
-      const today = formatCairoDate(new Date());
-      const { start, end } = getDateRangeForDay(today);
-      dateFilter = {
-        entryTime: {
-          gte: start,
-          lte: end,
-        },
-      };
+      const today = new Date();
+      start = getCairoDayStart(today);
+      end = getCairoDayEnd(today);
     }
 
     const records = await prisma.washRecord.findMany({
-      where: dateFilter,
+      where: {
+        entryTime: {
+          gte: start,
+          lte: end,
+        },
+      },
       include: { worker: true },
-      orderBy: { entryTime: 'desc' },
+      orderBy: { entryTime: "desc" },
     });
 
     return NextResponse.json({ success: true, data: records });
   } catch (error) {
-    console.error('Error fetching wash records:', error);
+    console.error("Error fetching wash records:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch wash records' },
+      { success: false, error: "Failed to fetch wash records" },
       { status: 500 }
     );
   }
@@ -61,14 +55,15 @@ export async function POST(request: NextRequest) {
 
     const recordData: Record<string, unknown> = {
       plateNumber: validated.plateNumber,
+      carType: validated.carType || null,
       washType: validated.washType,
-      amountPaid: validated.washType === 'FREE' ? 0 : validated.amountPaid,
+      amountPaid: validated.washType === "FREE" ? 0 : validated.amountPaid,
       tipAmount: validated.tipAmount || 0,
       notes: validated.notes,
-      status: 'IN_PROGRESS',
+      status: "IN_PROGRESS",
     };
 
-    if (validated.washType === 'FREE') {
+    if (validated.washType === "FREE") {
       recordData.paymentType = null;
     } else if (validated.paymentType) {
       recordData.paymentType = validated.paymentType;
@@ -79,21 +74,21 @@ export async function POST(request: NextRequest) {
     }
 
     const record = await prisma.washRecord.create({
-      data: recordData as Parameters<typeof prisma.washRecord.create>[0]['data'],
+      data: recordData as Parameters<typeof prisma.washRecord.create>[0]["data"],
       include: { worker: true },
     });
 
     return NextResponse.json({ success: true, data: record }, { status: 201 });
   } catch (error) {
-    console.error('Error creating wash record:', error);
-    if (error instanceof Error && error.name === 'ZodError') {
+    console.error("Error creating wash record:", error);
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
-        { success: false, error: 'Invalid input data' },
+        { success: false, error: "Invalid input data" },
         { status: 400 }
       );
     }
     return NextResponse.json(
-      { success: false, error: 'Failed to create wash record' },
+      { success: false, error: "Failed to create wash record" },
       { status: 500 }
     );
   }
