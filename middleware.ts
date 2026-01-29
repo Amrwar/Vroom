@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+﻿import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-const AUTH_COOKIE_NAME = "carwash_auth";
-const AUTH_TOKEN = "authenticated";
+const AUTH_COOKIE_NAME = 'carwash_auth';
+const AUTH_TOKEN = 'authenticated';
 
-const publicRoutes = ["/login", "/api/auth/login"];
+const publicRoutes = ['/login', '/api/auth/login'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -14,9 +14,9 @@ export function middleware(request: NextRequest) {
   }
 
   if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon") ||
-    pathname.includes(".")
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon') ||
+    pathname.includes('.')
   ) {
     return NextResponse.next();
   }
@@ -25,13 +25,13 @@ export function middleware(request: NextRequest) {
   const isAuthenticated = authCookie?.value === AUTH_TOKEN;
 
   if (!isAuthenticated) {
-    if (!pathname.startsWith("/api/")) {
-      const loginUrl = new URL("/login", request.url);
+    if (!pathname.startsWith('/api/')) {
+      const loginUrl = new URL('/login', request.url);
       return NextResponse.redirect(loginUrl);
     }
 
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: 'Unauthorized' },
       { status: 401 }
     );
   }
@@ -40,7 +40,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
