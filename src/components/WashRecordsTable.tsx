@@ -1,29 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { WashRecord, Worker, WashType, PaymentType, Status } from "@prisma/client";
-import { Search, Filter, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, X, DollarSign } from "lucide-react";
+import { WashRecord, Worker } from "@prisma/client";
+import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle } from "lucide-react";
 import clsx from "clsx";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
 interface WashRecordsTableProps {
   records: WashRecordWithWorker[];
-  onFinish: (id: string) => void;
+  onFinish: (id: string, phoneNumber?: string | null) => void;
   onEdit: (record: WashRecordWithWorker) => void;
   onDelete: (id: string) => void;
   onTogglePayment: (id: string, received: boolean) => void;
   loading?: boolean;
 }
 
-const washTypeColors: Record<WashType, string> = {
+const washTypeColors: Record<string, string> = {
   INNER: "badge-blue",
   OUTER: "badge-green",
   FULL: "badge-purple",
   FREE: "badge-gray",
 };
 
-const statusColors: Record<Status, string> = {
+const statusColors: Record<string, string> = {
   IN_PROGRESS: "badge-yellow",
   FINISHED: "badge-green",
 };
@@ -37,15 +37,16 @@ export default function WashRecordsTable({
   loading,
 }: WashRecordsTableProps) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<Status | "ALL">("ALL");
-  const [typeFilter, setTypeFilter] = useState<WashType | "ALL">("ALL");
-  const [paymentFilter, setPaymentFilter] = useState<"ALL" | "RECEIVED" | "PENDING">("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [typeFilter, setTypeFilter] = useState<string>("ALL");
+  const [paymentFilter, setPaymentFilter] = useState<string>("ALL");
   const [togglingPayment, setTogglingPayment] = useState<string | null>(null);
 
   const filteredRecords = records.filter((record) => {
     const matchesSearch =
       record.plateNumber.toLowerCase().includes(search.toLowerCase()) ||
-      (record.carType && record.carType.toLowerCase().includes(search.toLowerCase()));
+      (record.carType && record.carType.toLowerCase().includes(search.toLowerCase())) ||
+      (record.phoneNumber && record.phoneNumber.includes(search));
     const matchesStatus = statusFilter === "ALL" || record.status === statusFilter;
     const matchesType = typeFilter === "ALL" || record.washType === typeFilter;
     const matchesPayment =
@@ -85,7 +86,7 @@ export default function WashRecordsTable({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search plate or car type..."
+              placeholder="Search plate, car type, or phone..."
               className="input pl-10"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -95,7 +96,7 @@ export default function WashRecordsTable({
             <select
               className="select"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as Status | "ALL")}
+              onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="ALL">All Status</option>
               <option value="IN_PROGRESS">In Progress</option>
@@ -104,7 +105,7 @@ export default function WashRecordsTable({
             <select
               className="select"
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as WashType | "ALL")}
+              onChange={(e) => setTypeFilter(e.target.value)}
             >
               <option value="ALL">All Types</option>
               <option value="INNER">Inner</option>
@@ -115,7 +116,7 @@ export default function WashRecordsTable({
             <select
               className="select"
               value={paymentFilter}
-              onChange={(e) => setPaymentFilter(e.target.value as "ALL" | "RECEIVED" | "PENDING")}
+              onChange={(e) => setPaymentFilter(e.target.value)}
             >
               <option value="ALL">All Payments</option>
               <option value="RECEIVED">Received</option>
@@ -136,6 +137,7 @@ export default function WashRecordsTable({
               <tr>
                 <th>Plate</th>
                 <th>Car Type</th>
+                <th>Phone</th>
                 <th>Type</th>
                 <th>Worker</th>
                 <th>Time</th>
@@ -151,6 +153,14 @@ export default function WashRecordsTable({
                 <tr key={record.id} className="animate-fade-in">
                   <td className="font-medium text-gray-900">{record.plateNumber}</td>
                   <td className="text-gray-600">{record.carType || "-"}</td>
+                  <td className="text-gray-600">
+                    {record.phoneNumber ? (
+                      <span className="flex items-center gap-1">
+                        <MessageCircle className="w-3 h-3 text-green-600" />
+                        {record.phoneNumber}
+                      </span>
+                    ) : "-"}
+                  </td>
                   <td>
                     <span className={`badge ${washTypeColors[record.washType]}`}>
                       {record.washType}
@@ -205,7 +215,7 @@ export default function WashRecordsTable({
                     <div className="flex items-center justify-end gap-1">
                       {record.status === "IN_PROGRESS" && (
                         <button
-                          onClick={() => onFinish(record.id)}
+                          onClick={() => onFinish(record.id, record.phoneNumber)}
                           className="btn btn-sm btn-ghost text-green-600 hover:bg-green-50"
                           title="Finish"
                         >

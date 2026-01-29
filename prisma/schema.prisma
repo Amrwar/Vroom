@@ -23,6 +23,7 @@ model WashRecord {
   id              String       @id @default(uuid())
   plateNumber     String
   carType         String?
+  phoneNumber     String?
   washType        WashType
   entryTime       DateTime     @default(now())
   finishTime      DateTime?

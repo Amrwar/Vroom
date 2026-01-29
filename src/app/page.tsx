@@ -63,9 +63,33 @@ export default function DashboardPage() {
     throw new Error(data.error);
   };
 
-  const handleFinish = async (id: string) => {
+  const sendWhatsAppMessage = (phoneNumber: string) => {
+    // Format phone number for Egypt (remove leading 0, add country code)
+    let formattedPhone = phoneNumber.replace(/\D/g, "");
+    if (formattedPhone.startsWith("0")) {
+      formattedPhone = "2" + formattedPhone;
+    }
+    if (!formattedPhone.startsWith("20")) {
+      formattedPhone = "20" + formattedPhone;
+    }
+    
+    const message = encodeURIComponent("??????! ?????? ????? ????????. ????? ???????? VRoom CarWash! ???");
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+    window.open(whatsappUrl, "_blank");
+  };
+
+  const handleFinish = async (id: string, phoneNumber?: string | null) => {
     const record = records.find((r) => r.id === id);
-    if (record) setFinishingRecord(record);
+    if (record) {
+      setFinishingRecord(record);
+    }
+  };
+
+  const handleFinishSuccess = () => {
+    if (finishingRecord?.phoneNumber) {
+      sendWhatsAppMessage(finishingRecord.phoneNumber);
+    }
+    fetchData();
   };
 
   const handleDelete = (id: string) => {
@@ -117,11 +141,6 @@ export default function DashboardPage() {
 
   const goToToday = () => {
     setSelectedDate(new Date().toISOString().split("T")[0]);
-  };
-
-  const formatDisplayDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   };
 
   const stats = {
@@ -227,7 +246,7 @@ export default function DashboardPage() {
       <FinishModal
         isOpen={!!finishingRecord}
         onClose={() => setFinishingRecord(null)}
-        onSuccess={fetchData}
+        onSuccess={handleFinishSuccess}
         record={finishingRecord}
       />
 

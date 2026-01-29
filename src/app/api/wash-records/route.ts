@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { CreateWashRecordSchema } from "@/lib/validations";
 import { getCairoDayStart, getCairoDayEnd, getCairoMonthStart, getCairoMonthEnd, formatCairoDate } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
@@ -51,42 +50,36 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const validated = CreateWashRecordSchema.parse(body);
 
     const recordData: Record<string, unknown> = {
-      plateNumber: validated.plateNumber,
-      carType: validated.carType || null,
-      washType: validated.washType,
-      amountPaid: validated.washType === "FREE" ? 0 : validated.amountPaid,
-      tipAmount: validated.tipAmount || 0,
-      notes: validated.notes,
+      plateNumber: body.plateNumber.trim().toUpperCase(),
+      carType: body.carType || null,
+      phoneNumber: body.phoneNumber || null,
+      washType: body.washType,
+      amountPaid: body.washType === "FREE" ? 0 : body.amountPaid || 0,
+      tipAmount: body.tipAmount || 0,
+      notes: body.notes || null,
       status: "IN_PROGRESS",
     };
 
-    if (validated.washType === "FREE") {
+    if (body.washType === "FREE") {
       recordData.paymentType = null;
-    } else if (validated.paymentType) {
-      recordData.paymentType = validated.paymentType;
+    } else if (body.paymentType) {
+      recordData.paymentType = body.paymentType;
     }
 
-    if (validated.workerId) {
-      recordData.workerId = validated.workerId;
+    if (body.workerId) {
+      recordData.workerId = body.workerId;
     }
 
     const record = await prisma.washRecord.create({
-      data: recordData as Parameters<typeof prisma.washRecord.create>[0]["data"],
+      data: recordData as any,
       include: { worker: true },
     });
 
     return NextResponse.json({ success: true, data: record }, { status: 201 });
   } catch (error) {
     console.error("Error creating wash record:", error);
-    if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json(
-        { success: false, error: "Invalid input data" },
-        { status: 400 }
-      );
-    }
     return NextResponse.json(
       { success: false, error: "Failed to create wash record" },
       { status: 500 }

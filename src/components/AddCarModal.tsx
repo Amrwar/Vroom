@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { Worker } from "@prisma/client";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Phone } from "lucide-react";
 
 type WashType = "INNER" | "OUTER" | "FREE" | "FULL";
 type PaymentType = "CASH" | "INSTAPAY";
@@ -44,6 +44,7 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
   const [formData, setFormData] = useState({
     plateNumber: "",
     carType: "",
+    phoneNumber: "",
     washType: "OUTER" as WashType,
     workerId: "",
     paymentType: "CASH" as PaymentType | "",
@@ -59,6 +60,7 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
       setFormData({
         plateNumber: "",
         carType: "",
+        phoneNumber: "",
         washType: "OUTER",
         workerId: "",
         paymentType: "CASH",
@@ -126,6 +128,7 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
         body: JSON.stringify({
           plateNumber: formData.plateNumber.trim().toUpperCase(),
           carType: formData.carType.trim() || null,
+          phoneNumber: formData.phoneNumber.trim() || null,
           washType: formData.washType,
           workerId: formData.workerId || null,
           paymentType: isFreeWash ? null : formData.paymentType,
@@ -170,28 +173,44 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Add New Car" size="lg">
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label className="label">Plate Number *</label>
-          <input
-            type="text"
-            className="input uppercase"
-            placeholder="ABC 1234"
-            value={formData.plateNumber}
-            onChange={(e) => setFormData({ ...formData, plateNumber: e.target.value.toUpperCase() })}
-            autoFocus
-          />
-          {errors.plateNumber && <p className="text-sm text-red-500 mt-1">{errors.plateNumber}</p>}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">Plate Number *</label>
+            <input
+              type="text"
+              className="input uppercase"
+              placeholder="ABC 1234"
+              value={formData.plateNumber}
+              onChange={(e) => setFormData({ ...formData, plateNumber: e.target.value.toUpperCase() })}
+              autoFocus
+            />
+            {errors.plateNumber && <p className="text-sm text-red-500 mt-1">{errors.plateNumber}</p>}
+          </div>
+          <div>
+            <label className="label">Car Type</label>
+            <input
+              type="text"
+              className="input"
+              placeholder="e.g., Hyundai Elantra"
+              value={formData.carType}
+              onChange={(e) => setFormData({ ...formData, carType: e.target.value })}
+            />
+          </div>
         </div>
 
         <div>
-          <label className="label">Car Type</label>
+          <label className="label flex items-center gap-2">
+            <Phone className="w-4 h-4" />
+            Phone Number (for WhatsApp notification)
+          </label>
           <input
-            type="text"
+            type="tel"
             className="input"
-            placeholder="e.g., Hyundai Elantra, Toyota Corolla"
-            value={formData.carType}
-            onChange={(e) => setFormData({ ...formData, carType: e.target.value })}
+            placeholder="e.g., 01012345678"
+            value={formData.phoneNumber}
+            onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value.replace(/[^0-9]/g, "") })}
           />
+          <p className="text-xs text-gray-500 mt-1">Customer will receive WhatsApp message when car is ready</p>
         </div>
 
         <div>
