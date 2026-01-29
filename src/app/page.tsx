@@ -8,7 +8,7 @@ import FinishModal from "@/components/FinishModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import WashRecordsTable from "@/components/WashRecordsTable";
 import StatsCard from "@/components/StatsCard";
-import { Plus, RefreshCw, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign } from "lucide-react";
+import { Plus, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign } from "lucide-react";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
@@ -64,26 +64,6 @@ export default function DashboardPage() {
   const handleFinish = async (id: string) => {
     const record = records.find((r) => r.id === id);
     if (record) setFinishingRecord(record);
-  };
-
-  const confirmFinish = async (paymentType?: string, amountPaid?: number, tipAmount?: number) => {
-    if (!finishingRecord) return;
-
-    try {
-      const response = await fetch(`/api/wash-records/${finishingRecord.id}/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentType, amountPaid, tipAmount }),
-      });
-
-      if (response.ok) {
-        fetchData();
-      }
-    } catch (error) {
-      console.error("Failed to finish record:", error);
-    } finally {
-      setFinishingRecord(null);
-    }
   };
 
   const handleDelete = async () => {
@@ -200,14 +180,12 @@ export default function DashboardPage() {
         />
       )}
 
-      {finishingRecord && (
-        <FinishModal
-          isOpen={!!finishingRecord}
-          onClose={() => setFinishingRecord(null)}
-          onConfirm={confirmFinish}
-          record={finishingRecord}
-        />
-      )}
+      <FinishModal
+        isOpen={!!finishingRecord}
+        onClose={() => setFinishingRecord(null)}
+        onSuccess={fetchData}
+        record={finishingRecord}
+      />
 
       <DeleteConfirmModal
         isOpen={!!deletingId}
