@@ -1,7 +1,7 @@
-import { cookies } from 'next/headers';
+import { cookies } from "next/headers";
 
-const AUTH_COOKIE_NAME = 'carwash_auth';
-const AUTH_TOKEN = 'authenticated';
+const AUTH_COOKIE_NAME = "carwash_auth";
+const AUTH_TOKEN = "authenticated";
 
 export async function isAuthenticated(): Promise<boolean> {
   const cookieStore = await cookies();
@@ -13,10 +13,10 @@ export async function setAuthCookie(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(AUTH_COOKIE_NAME, AUTH_TOKEN, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-    path: '/',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    // No maxAge = session cookie (expires when browser closes)
   });
 }
 
@@ -28,7 +28,7 @@ export async function clearAuthCookie(): Promise<void> {
 export function verifyPassword(password: string): boolean {
   const correctPassword = process.env.ADMIN_PASSWORD;
   if (!correctPassword) {
-    console.warn('ADMIN_PASSWORD not set in environment variables');
+    console.warn("ADMIN_PASSWORD not set in environment variables");
     return false;
   }
   return password === correctPassword;
