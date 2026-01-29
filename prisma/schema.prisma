@@ -61,4 +61,5 @@ enum PaymentType {
 enum Status {
   IN_PROGRESS
   FINISHED
+  CANCELLED
 }

@@ -5,10 +5,11 @@ import { WashRecord, Worker } from "@prisma/client";
 import AddCarModal from "@/components/AddCarModal";
 import EditCarModal from "@/components/EditCarModal";
 import FinishModal from "@/components/FinishModal";
+import CancelModal from "@/components/CancelModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import WashRecordsTable from "@/components/WashRecordsTable";
 import StatsCard from "@/components/StatsCard";
-import { Plus, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign, ChevronLeft, ChevronRight, Calendar, Banknote, CreditCard } from "lucide-react";
+import { Plus, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign, ChevronLeft, ChevronRight, Calendar, Banknote, CreditCard, XCircle } from "lucide-react";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
@@ -19,6 +20,7 @@ export default function DashboardPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<WashRecordWithWorker | null>(null);
   const [finishingRecord, setFinishingRecord] = useState<WashRecordWithWorker | null>(null);
+  const [cancellingRecord, setCancellingRecord] = useState<WashRecordWithWorker | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<WashRecordWithWorker | null>(null);
   const [exporting, setExporting] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -64,7 +66,6 @@ export default function DashboardPage() {
   };
 
   const sendWhatsAppMessage = (phoneNumber: string) => {
-    // Format phone number for Egypt (remove leading 0, add country code)
     let formattedPhone = phoneNumber.replace(/\D/g, "");
     if (formattedPhone.startsWith("0")) {
       formattedPhone = "2" + formattedPhone;
@@ -73,8 +74,7 @@ export default function DashboardPage() {
       formattedPhone = "20" + formattedPhone;
     }
     
-const message = encodeURIComponent("مرحباً! سيارتك جاهزة للاستلام\n\nHello! Your car is ready for pickup.\n\nThank you for choosing VRoom CarWash! 🚗✨");
-
+    const message = encodeURIComponent("Hello! Your car is ready for pickup. Thank you for choosing VRoom CarWash!");
     const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
     window.open(whatsappUrl, "_blank");
   };
@@ -91,6 +91,10 @@ const message = encodeURIComponent("مرحباً! سيارتك جاهزة للا
       sendWhatsAppMessage(finishingRecord.phoneNumber);
     }
     fetchData();
+  };
+
+  const handleCancel = (record: WashRecordWithWorker) => {
+    setCancellingRecord(record);
   };
 
   const handleDelete = (id: string) => {
@@ -148,6 +152,7 @@ const message = encodeURIComponent("مرحباً! سيارتك جاهزة للا
     total: records.length,
     inProgress: records.filter((r) => r.status === "IN_PROGRESS").length,
     finished: records.filter((r) => r.status === "FINISHED").length,
+    cancelled: records.filter((r) => r.status === "CANCELLED").length,
     revenue: records.reduce((sum, r) => sum + r.amountPaid, 0),
     cashReceived: records
       .filter((r) => r.paymentType === "CASH" && r.paymentReceived)
@@ -208,10 +213,11 @@ const message = encodeURIComponent("مرحباً! سيارتك جاهزة للا
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <StatsCard title="Total Cars" value={stats.total} icon={Car} color="blue" />
         <StatsCard title="In Progress" value={stats.inProgress} icon={Clock} color="yellow" />
         <StatsCard title="Finished" value={stats.finished} icon={CheckCircle} color="green" />
+        <StatsCard title="Left" value={stats.cancelled} icon={XCircle} color="red" />
         <StatsCard title="Total Revenue" value={`${stats.revenue} EGP`} icon={DollarSign} color="purple" />
         <StatsCard title="Cash Received" value={`${stats.cashReceived} EGP`} icon={Banknote} color="green" />
         <StatsCard title="InstaPay Received" value={`${stats.instapayReceived} EGP`} icon={CreditCard} color="blue" />
@@ -220,6 +226,7 @@ const message = encodeURIComponent("مرحباً! سيارتك جاهزة للا
       <WashRecordsTable
         records={records}
         onFinish={handleFinish}
+        onCancel={handleCancel}
         onEdit={setEditingRecord}
         onDelete={handleDelete}
         onTogglePayment={handleTogglePayment}
@@ -249,6 +256,13 @@ const message = encodeURIComponent("مرحباً! سيارتك جاهزة للا
         onClose={() => setFinishingRecord(null)}
         onSuccess={handleFinishSuccess}
         record={finishingRecord}
+      />
+
+      <CancelModal
+        isOpen={!!cancellingRecord}
+        onClose={() => setCancellingRecord(null)}
+        onSuccess={fetchData}
+        record={cancellingRecord}
       />
 
       <DeleteConfirmModal

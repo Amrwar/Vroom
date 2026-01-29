@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { WashRecord, Worker } from "@prisma/client";
-import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
 import clsx from "clsx";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
@@ -10,6 +10,7 @@ type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 interface WashRecordsTableProps {
   records: WashRecordWithWorker[];
   onFinish: (id: string, phoneNumber?: string | null) => void;
+  onCancel: (record: WashRecordWithWorker) => void;
   onEdit: (record: WashRecordWithWorker) => void;
   onDelete: (id: string) => void;
   onTogglePayment: (id: string, received: boolean) => void;
@@ -26,6 +27,7 @@ const washTypeColors: Record<string, string> = {
 const statusColors: Record<string, string> = {
   IN_PROGRESS: "badge-yellow",
   FINISHED: "badge-green",
+  CANCELLED: "badge-red",
 };
 
 const ITEMS_PER_PAGE = 10;
@@ -33,6 +35,7 @@ const ITEMS_PER_PAGE = 10;
 export default function WashRecordsTable({
   records,
   onFinish,
+  onCancel,
   onEdit,
   onDelete,
   onTogglePayment,
@@ -59,12 +62,10 @@ export default function WashRecordsTable({
     return matchesSearch && matchesStatus && matchesType && matchesPayment;
   });
 
-  // Pagination
   const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedRecords = filteredRecords.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  // Reset to page 1 when filters change
   const handleFilterChange = (setter: (value: string) => void, value: string) => {
     setter(value);
     setCurrentPage(1);
@@ -120,6 +121,7 @@ export default function WashRecordsTable({
               <option value="ALL">All Status</option>
               <option value="IN_PROGRESS">In Progress</option>
               <option value="FINISHED">Finished</option>
+              <option value="CANCELLED">Left/Cancelled</option>
             </select>
             <select
               className="select"
@@ -170,8 +172,15 @@ export default function WashRecordsTable({
               </thead>
               <tbody>
                 {paginatedRecords.map((record) => (
-                  <tr key={record.id} className="animate-fade-in">
-                    <td className="font-medium text-gray-900">{record.plateNumber}</td>
+                  <tr key={record.id} className={clsx("animate-fade-in", record.status === "CANCELLED" && "bg-red-50")}>
+                    <td className="font-medium text-gray-900">
+                      <span className="flex items-center gap-2">
+                        {record.status === "CANCELLED" && (
+                          <XCircle className="w-4 h-4 text-red-500" title="Left without completing" />
+                        )}
+                        {record.plateNumber}
+                      </span>
+                    </td>
                     <td className="text-gray-600">{record.carType || "-"}</td>
                     <td className="text-gray-600">
                       {record.phoneNumber ? (
@@ -204,7 +213,7 @@ export default function WashRecordsTable({
                       )}
                     </td>
                     <td className="text-center">
-                      {record.washType !== "FREE" && (
+                      {record.washType !== "FREE" && record.status !== "CANCELLED" && (
                         <button
                           onClick={() => handleTogglePayment(record.id, record.paymentReceived)}
                           disabled={togglingPayment === record.id}
@@ -228,19 +237,28 @@ export default function WashRecordsTable({
                     </td>
                     <td>
                       <span className={`badge ${statusColors[record.status]}`}>
-                        {record.status === "IN_PROGRESS" ? "In Progress" : "Finished"}
+                        {record.status === "IN_PROGRESS" ? "In Progress" : record.status === "FINISHED" ? "Finished" : "Left"}
                       </span>
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
                         {record.status === "IN_PROGRESS" && (
-                          <button
-                            onClick={() => onFinish(record.id, record.phoneNumber)}
-                            className="btn btn-sm btn-ghost text-green-600 hover:bg-green-50"
-                            title="Finish"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => onFinish(record.id, record.phoneNumber)}
+                              className="btn btn-sm btn-ghost text-green-600 hover:bg-green-50"
+                              title="Finish"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => onCancel(record)}
+                              className="btn btn-sm btn-ghost text-amber-600 hover:bg-amber-50"
+                              title="Mark as Left"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={() => onEdit(record)}
@@ -264,7 +282,6 @@ export default function WashRecordsTable({
             </table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
               <div className="text-sm text-gray-500">
