@@ -197,7 +197,7 @@ export default function ReportsPage() {
             <StatsCard title="In Progress" value={stats.inProgress} icon={Clock} color="yellow" />
             <StatsCard title="Finished" value={stats.finished} icon={CheckCircle} color="green" />
             <StatsCard title="Revenue" value={`${stats.totalRevenue} EGP`} icon={DollarSign} color="purple" />
-            <StatsCard title="InstaPay Tips" value={`${stats.instapayTips} EGP`} icon={CreditCard} color="amber" />
+            <StatsCard title="InstaPay Tips" value={`${stats.instapayTips} EGP`} icon={CreditCard} color="yellow" />
             <StatsCard title="Net Revenue" value={`${stats.netRevenue} EGP`} icon={TrendingUp} color="green" />
             <StatsCard title="Cash" value={`${stats.totalCash} EGP`} icon={Banknote} color="gray" />
             <StatsCard title="InstaPay" value={`${stats.totalInstapay} EGP`} icon={Smartphone} color="blue" />
