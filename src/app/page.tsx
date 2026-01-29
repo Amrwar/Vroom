@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<WashRecordWithWorker | null>(null);
   const [finishingRecord, setFinishingRecord] = useState<WashRecordWithWorker | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState<WashRecordWithWorker | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
@@ -66,22 +66,9 @@ export default function DashboardPage() {
     if (record) setFinishingRecord(record);
   };
 
-  const handleDelete = async () => {
-    if (!deletingId) return;
-
-    try {
-      const response = await fetch(`/api/wash-records/${deletingId}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        fetchData();
-      }
-    } catch (error) {
-      console.error("Failed to delete record:", error);
-    } finally {
-      setDeletingId(null);
-    }
+  const handleDelete = (id: string) => {
+    const record = records.find((r) => r.id === id);
+    if (record) setDeletingRecord(record);
   };
 
   const handleTogglePayment = async (id: string, received: boolean) => {
@@ -157,7 +144,7 @@ export default function DashboardPage() {
         records={records}
         onFinish={handleFinish}
         onEdit={setEditingRecord}
-        onDelete={setDeletingId}
+        onDelete={handleDelete}
         onTogglePayment={handleTogglePayment}
         loading={loading}
       />
@@ -188,9 +175,10 @@ export default function DashboardPage() {
       />
 
       <DeleteConfirmModal
-        isOpen={!!deletingId}
-        onClose={() => setDeletingId(null)}
-        onConfirm={handleDelete}
+        isOpen={!!deletingRecord}
+        onClose={() => setDeletingRecord(null)}
+        onSuccess={fetchData}
+        record={deletingRecord}
       />
     </div>
   );
