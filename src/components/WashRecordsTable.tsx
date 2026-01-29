@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { WashRecord, Worker } from "@prisma/client";
-import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle } from "lucide-react";
+import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
@@ -28,6 +28,8 @@ const statusColors: Record<string, string> = {
   FINISHED: "badge-green",
 };
 
+const ITEMS_PER_PAGE = 10;
+
 export default function WashRecordsTable({
   records,
   onFinish,
@@ -41,6 +43,7 @@ export default function WashRecordsTable({
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [paymentFilter, setPaymentFilter] = useState<string>("ALL");
   const [togglingPayment, setTogglingPayment] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const filteredRecords = records.filter((record) => {
     const matchesSearch =
@@ -55,6 +58,22 @@ export default function WashRecordsTable({
       (paymentFilter === "PENDING" && !record.paymentReceived);
     return matchesSearch && matchesStatus && matchesType && matchesPayment;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedRecords = filteredRecords.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = (setter: (value: string) => void, value: string) => {
+    setter(value);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCurrentPage(1);
+  };
 
   const formatTime = (date: Date) => {
     return new Date(date).toLocaleTimeString("en-US", {
@@ -89,14 +108,14 @@ export default function WashRecordsTable({
               placeholder="Search plate, car type, or phone..."
               className="input pl-10"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
           <div className="flex gap-2">
             <select
               className="select"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
             >
               <option value="ALL">All Status</option>
               <option value="IN_PROGRESS">In Progress</option>
@@ -105,7 +124,7 @@ export default function WashRecordsTable({
             <select
               className="select"
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)}
             >
               <option value="ALL">All Types</option>
               <option value="INNER">Inner</option>
@@ -116,7 +135,7 @@ export default function WashRecordsTable({
             <select
               className="select"
               value={paymentFilter}
-              onChange={(e) => setPaymentFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(setPaymentFilter, e.target.value)}
             >
               <option value="ALL">All Payments</option>
               <option value="RECEIVED">Received</option>
@@ -131,118 +150,161 @@ export default function WashRecordsTable({
           <p className="text-gray-500">No records found</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Plate</th>
-                <th>Car Type</th>
-                <th>Phone</th>
-                <th>Type</th>
-                <th>Worker</th>
-                <th>Time</th>
-                <th>Payment</th>
-                <th>Amount</th>
-                <th className="text-center">Received</th>
-                <th>Status</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRecords.map((record) => (
-                <tr key={record.id} className="animate-fade-in">
-                  <td className="font-medium text-gray-900">{record.plateNumber}</td>
-                  <td className="text-gray-600">{record.carType || "-"}</td>
-                  <td className="text-gray-600">
-                    {record.phoneNumber ? (
-                      <span className="flex items-center gap-1">
-                        <MessageCircle className="w-3 h-3 text-green-600" />
-                        {record.phoneNumber}
+        <>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Plate</th>
+                  <th>Car Type</th>
+                  <th>Phone</th>
+                  <th>Type</th>
+                  <th>Worker</th>
+                  <th>Time</th>
+                  <th>Payment</th>
+                  <th>Amount</th>
+                  <th className="text-center">Received</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedRecords.map((record) => (
+                  <tr key={record.id} className="animate-fade-in">
+                    <td className="font-medium text-gray-900">{record.plateNumber}</td>
+                    <td className="text-gray-600">{record.carType || "-"}</td>
+                    <td className="text-gray-600">
+                      {record.phoneNumber ? (
+                        <span className="flex items-center gap-1">
+                          <MessageCircle className="w-3 h-3 text-green-600" />
+                          {record.phoneNumber}
+                        </span>
+                      ) : "-"}
+                    </td>
+                    <td>
+                      <span className={`badge ${washTypeColors[record.washType]}`}>
+                        {record.washType}
                       </span>
-                    ) : "-"}
-                  </td>
-                  <td>
-                    <span className={`badge ${washTypeColors[record.washType]}`}>
-                      {record.washType}
-                    </span>
-                  </td>
-                  <td className="text-gray-600">{record.worker?.name || "-"}</td>
-                  <td className="text-gray-600">{formatTime(record.entryTime)}</td>
-                  <td>
-                    {record.paymentType ? (
-                      <span className={`badge ${record.paymentType === "CASH" ? "badge-green" : "badge-blue"}`}>
-                        {record.paymentType}
-                      </span>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td className="text-gray-900">
-                    {record.amountPaid > 0 ? `${record.amountPaid} EGP` : "-"}
-                    {record.tipAmount > 0 && (
-                      <span className="text-green-600 text-xs ml-1">(+{record.tipAmount})</span>
-                    )}
-                  </td>
-                  <td className="text-center">
-                    {record.washType !== "FREE" && (
-                      <button
-                        onClick={() => handleTogglePayment(record.id, record.paymentReceived)}
-                        disabled={togglingPayment === record.id}
-                        className={clsx(
-                          "w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                          record.paymentReceived
-                            ? "bg-green-100 text-green-600 hover:bg-green-200"
-                            : "bg-gray-100 text-gray-400 hover:bg-gray-200"
-                        )}
-                        title={record.paymentReceived ? "Payment received" : "Mark as received"}
-                      >
-                        {togglingPayment === record.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : record.paymentReceived ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <DollarSign className="w-4 h-4" />
-                        )}
-                      </button>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`badge ${statusColors[record.status]}`}>
-                      {record.status === "IN_PROGRESS" ? "In Progress" : "Finished"}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="flex items-center justify-end gap-1">
-                      {record.status === "IN_PROGRESS" && (
+                    </td>
+                    <td className="text-gray-600">{record.worker?.name || "-"}</td>
+                    <td className="text-gray-600">{formatTime(record.entryTime)}</td>
+                    <td>
+                      {record.paymentType ? (
+                        <span className={`badge ${record.paymentType === "CASH" ? "badge-green" : "badge-blue"}`}>
+                          {record.paymentType}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="text-gray-900">
+                      {record.amountPaid > 0 ? `${record.amountPaid} EGP` : "-"}
+                      {record.tipAmount > 0 && (
+                        <span className="text-green-600 text-xs ml-1">(+{record.tipAmount})</span>
+                      )}
+                    </td>
+                    <td className="text-center">
+                      {record.washType !== "FREE" && (
                         <button
-                          onClick={() => onFinish(record.id, record.phoneNumber)}
-                          className="btn btn-sm btn-ghost text-green-600 hover:bg-green-50"
-                          title="Finish"
+                          onClick={() => handleTogglePayment(record.id, record.paymentReceived)}
+                          disabled={togglingPayment === record.id}
+                          className={clsx(
+                            "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                            record.paymentReceived
+                              ? "bg-green-100 text-green-600 hover:bg-green-200"
+                              : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                          )}
+                          title={record.paymentReceived ? "Payment received" : "Mark as received"}
                         >
-                          <CheckCircle className="w-4 h-4" />
+                          {togglingPayment === record.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : record.paymentReceived ? (
+                            <Check className="w-4 h-4" />
+                          ) : (
+                            <DollarSign className="w-4 h-4" />
+                          )}
                         </button>
                       )}
-                      <button
-                        onClick={() => onEdit(record)}
-                        className="btn btn-sm btn-ghost text-blue-600 hover:bg-blue-50"
-                        title="Edit"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onDelete(record.id)}
-                        className="btn btn-sm btn-ghost text-red-600 hover:bg-red-50"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </td>
+                    <td>
+                      <span className={`badge ${statusColors[record.status]}`}>
+                        {record.status === "IN_PROGRESS" ? "In Progress" : "Finished"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex items-center justify-end gap-1">
+                        {record.status === "IN_PROGRESS" && (
+                          <button
+                            onClick={() => onFinish(record.id, record.phoneNumber)}
+                            className="btn btn-sm btn-ghost text-green-600 hover:bg-green-50"
+                            title="Finish"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onEdit(record)}
+                          className="btn btn-sm btn-ghost text-blue-600 hover:bg-blue-50"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(record.id)}
+                          className="btn btn-sm btn-ghost text-red-600 hover:bg-red-50"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+              <div className="text-sm text-gray-500">
+                Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length} records
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={clsx(
+                        "w-8 h-8 rounded-lg text-sm font-medium",
+                        currentPage === page
+                          ? "bg-red-600 text-white"
+                          : "hover:bg-gray-100 text-gray-600"
+                      )}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

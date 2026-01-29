@@ -48,11 +48,14 @@ const formatMoney = (amount: number) => {
   return Math.round(amount * 100) / 100;
 };
 
+const ITEMS_PER_PAGE = 15;
+
 export default function ReportsPage() {
   const [records, setRecords] = useState<WashRecordWithWorker[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(() => formatDate(new Date(), "yyyy-MM"));
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
@@ -61,6 +64,7 @@ export default function ReportsPage() {
       const data = await response.json();
       if (data.success) {
         setRecords(data.data);
+        setCurrentPage(1);
       }
     } catch (error) {
       console.error("Failed to fetch records:", error);
@@ -101,6 +105,11 @@ export default function ReportsPage() {
   const handleExportMonthly = () => {
     window.open(`/api/export/monthly?month=${selectedMonth}`, "_blank");
   };
+
+  // Pagination
+  const totalPages = Math.ceil(records.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedRecords = records.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const instapayTips = formatMoney(records
     .filter((r) => r.paymentType === "INSTAPAY")
@@ -241,7 +250,7 @@ export default function ReportsPage() {
                         <p className="text-sm text-gray-500">
                           {data.count} cars
                           {data.instapayTips > 0 && (
-                            <span className="text-amber-600"> ? InstaPay Tips: {formatMoney(data.instapayTips)} EGP</span>
+                            <span className="text-amber-600"> - InstaPay Tips: {formatMoney(data.instapayTips)} EGP</span>
                           )}
                         </p>
                       </div>
@@ -276,14 +285,14 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {records.length === 0 ? (
+                  {paginatedRecords.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="text-center py-12 text-gray-500">
                         No records for this month
                       </td>
                     </tr>
                   ) : (
-                    records.map((record) => (
+                    paginatedRecords.map((record) => (
                       <tr key={record.id}>
                         <td className="text-gray-600">
                           {formatDate(record.entryTime, "MMM d")}
@@ -341,6 +350,59 @@ export default function ReportsPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                <div className="text-sm text-gray-500">
+                  Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, records.length)} of {records.length} records
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      let page;
+                      if (totalPages <= 5) {
+                        page = i + 1;
+                      } else if (currentPage <= 3) {
+                        page = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        page = totalPages - 4 + i;
+                      } else {
+                        page = currentPage - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={clsx(
+                            "w-8 h-8 rounded-lg text-sm font-medium",
+                            currentPage === page
+                              ? "bg-red-600 text-white"
+                              : "hover:bg-gray-100 text-gray-600"
+                          )}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
