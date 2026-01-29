@@ -8,7 +8,7 @@ import FinishModal from "@/components/FinishModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import WashRecordsTable from "@/components/WashRecordsTable";
 import StatsCard from "@/components/StatsCard";
-import { Plus, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign } from "lucide-react";
+import { Plus, FileSpreadsheet, Car, Clock, CheckCircle, DollarSign, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
@@ -21,13 +21,15 @@ export default function DashboardPage() {
   const [finishingRecord, setFinishingRecord] = useState<WashRecordWithWorker | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<WashRecordWithWorker | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
 
-  const today = new Date().toISOString().split("T")[0];
+  const isToday = selectedDate === new Date().toISOString().split("T")[0];
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       const [recordsRes, workersRes] = await Promise.all([
-        fetch(`/api/wash-records?date=${today}`),
+        fetch(`/api/wash-records?date=${selectedDate}`),
         fetch("/api/workers"),
       ]);
 
@@ -41,7 +43,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [today]);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchData();
@@ -92,12 +94,12 @@ export default function DashboardPage() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const response = await fetch(`/api/export/daily?date=${today}`);
+      const response = await fetch(`/api/export/daily?date=${selectedDate}`);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `carwash-${today}.xlsx`;
+      a.download = `carwash-${selectedDate}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -105,6 +107,21 @@ export default function DashboardPage() {
     } finally {
       setExporting(false);
     }
+  };
+
+  const navigateDate = (direction: "prev" | "next") => {
+    const date = new Date(selectedDate);
+    date.setDate(date.getDate() + (direction === "next" ? 1 : -1));
+    setSelectedDate(date.toISOString().split("T")[0]);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date().toISOString().split("T")[0]);
+  };
+
+  const formatDisplayDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   };
 
   const stats = {
@@ -118,8 +135,40 @@ export default function DashboardPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Today's Dashboard</h1>
-          <p className="text-gray-500">{new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isToday ? "Today's Dashboard" : "Dashboard"}
+          </h1>
+          <div className="flex items-center gap-2 mt-1">
+            <button
+              onClick={() => navigateDate("prev")}
+              className="p-1 hover:bg-gray-100 rounded"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-500" />
+            </button>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-gray-400" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="text-gray-600 border-none bg-transparent cursor-pointer hover:text-gray-900"
+              />
+            </div>
+            <button
+              onClick={() => navigateDate("next")}
+              className="p-1 hover:bg-gray-100 rounded"
+            >
+              <ChevronRight className="w-5 h-5 text-gray-500" />
+            </button>
+            {!isToday && (
+              <button
+                onClick={goToToday}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium ml-2"
+              >
+                Go to Today
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <button onClick={handleExport} disabled={exporting} className="btn btn-secondary">
