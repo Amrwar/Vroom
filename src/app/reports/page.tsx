@@ -44,6 +44,10 @@ const formatTime = (date: Date | string) => {
   return new Date(date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 };
 
+const formatMoney = (amount: number) => {
+  return Math.round(amount * 100) / 100;
+};
+
 export default function ReportsPage() {
   const [records, setRecords] = useState<WashRecordWithWorker[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -98,13 +102,12 @@ export default function ReportsPage() {
     window.open(`/api/export/monthly?month=${selectedMonth}`, "_blank");
   };
 
-  // Calculate stats - only InstaPay tips
-  const instapayTips = records
+  const instapayTips = formatMoney(records
     .filter((r) => r.paymentType === "INSTAPAY")
-    .reduce((sum, r) => sum + r.tipAmount, 0);
+    .reduce((sum, r) => sum + r.tipAmount, 0));
 
-  const totalRevenue = records.reduce((sum, r) => sum + r.amountPaid, 0);
-  const netRevenue = totalRevenue - instapayTips;
+  const totalRevenue = formatMoney(records.reduce((sum, r) => sum + r.amountPaid, 0));
+  const netRevenue = formatMoney(totalRevenue - instapayTips);
 
   const stats = {
     totalCars: records.length,
@@ -113,11 +116,10 @@ export default function ReportsPage() {
     totalRevenue,
     instapayTips,
     netRevenue,
-    totalCash: records.filter((r) => r.paymentType === "CASH").reduce((sum, r) => sum + r.amountPaid, 0),
-    totalInstapay: records.filter((r) => r.paymentType === "INSTAPAY").reduce((sum, r) => sum + r.amountPaid, 0),
+    totalCash: formatMoney(records.filter((r) => r.paymentType === "CASH").reduce((sum, r) => sum + r.amountPaid, 0)),
+    totalInstapay: formatMoney(records.filter((r) => r.paymentType === "INSTAPAY").reduce((sum, r) => sum + r.amountPaid, 0)),
   };
 
-  // Calculate breakdown by wash type
   const byWashType = records.reduce((acc, r) => {
     if (!acc[r.washType]) {
       acc[r.washType] = { count: 0, revenue: 0 };
@@ -127,7 +129,6 @@ export default function ReportsPage() {
     return acc;
   }, {} as Record<string, { count: number; revenue: number }>);
 
-  // Calculate breakdown by worker - only InstaPay tips
   const byWorker = records.reduce((acc, r) => {
     const name = r.worker?.name || "Unassigned";
     if (!acc[name]) {
@@ -216,7 +217,7 @@ export default function ReportsPage() {
                       <span className={clsx("badge", washTypeBadges[type])}>{type}</span>
                       <span className="text-gray-600">{data.count} cars</span>
                     </div>
-                    <span className="font-semibold text-gray-900">{data.revenue} EGP</span>
+                    <span className="font-semibold text-gray-900">{formatMoney(data.revenue)} EGP</span>
                   </div>
                 ))}
                 {Object.keys(byWashType).length === 0 && (
@@ -240,11 +241,11 @@ export default function ReportsPage() {
                         <p className="text-sm text-gray-500">
                           {data.count} cars
                           {data.instapayTips > 0 && (
-                            <span className="text-amber-600"> ? InstaPay Tips: {data.instapayTips} EGP</span>
+                            <span className="text-amber-600"> ? InstaPay Tips: {formatMoney(data.instapayTips)} EGP</span>
                           )}
                         </p>
                       </div>
-                      <span className="font-semibold text-gray-900">{data.revenue} EGP</span>
+                      <span className="font-semibold text-gray-900">{formatMoney(data.revenue)} EGP</span>
                     </div>
                   ))}
                 {Object.keys(byWorker).length === 0 && (
@@ -317,11 +318,11 @@ export default function ReportsPage() {
                           )}
                         </td>
                         <td className="font-medium text-gray-900">
-                          {record.amountPaid > 0 ? `${record.amountPaid} EGP` : "-"}
+                          {record.amountPaid > 0 ? `${formatMoney(record.amountPaid)} EGP` : "-"}
                         </td>
                         <td className="text-amber-600 font-medium">
                           {record.paymentType === "INSTAPAY" && record.tipAmount > 0
-                            ? `${record.tipAmount} EGP`
+                            ? `${formatMoney(record.tipAmount)} EGP`
                             : "-"}
                         </td>
                         <td>
