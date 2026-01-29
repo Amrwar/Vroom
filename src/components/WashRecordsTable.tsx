@@ -176,7 +176,7 @@ export default function WashRecordsTable({
                     <td className="font-medium text-gray-900">
                       <span className="flex items-center gap-2">
                         {record.status === "CANCELLED" && (
-                          <XCircle className="w-4 h-4 text-red-500" title="Left without completing" />
+                          <span title="Left without completing"><XCircle className="w-4 h-4 text-red-500" /></span>
                         )}
                         {record.plateNumber}
                       </span>
