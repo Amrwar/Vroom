@@ -32,6 +32,7 @@ model WashRecord {
   amountPaid      Float        @default(0)
   tipAmount       Float        @default(0)
   paymentReceived Boolean      @default(false)
+  instapayProof   String?      @db.Text
   notes           String?
   status          Status       @default(IN_PROGRESS)
   workerId        String?

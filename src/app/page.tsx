@@ -74,7 +74,7 @@ export default function DashboardPage() {
       formattedPhone = "20" + formattedPhone;
     }
     
-const message = encodeURIComponent("مرحباً! سيارتك جاهزة للاستلام\n\nHello! Your car is ready for pickup.\n\nThank you for choosing VRoom CarWash! 🚗✨");
+    const message = encodeURIComponent("Hello! Your car is ready for pickup. Thank you for choosing VRoom CarWash!");
     const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
     window.open(whatsappUrl, "_blank");
   };
@@ -230,6 +230,7 @@ const message = encodeURIComponent("مرحباً! سيارتك جاهزة للا
         onEdit={setEditingRecord}
         onDelete={handleDelete}
         onTogglePayment={handleTogglePayment}
+        onUpdateRecord={fetchData}
         loading={loading}
       />
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { WashRecord, Worker } from "@prisma/client";
-import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
+import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle, ChevronLeft, ChevronRight, XCircle, Camera, Image } from "lucide-react";
 import clsx from "clsx";
+import ImageProofModal from "./ImageProofModal";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
@@ -14,6 +15,7 @@ interface WashRecordsTableProps {
   onEdit: (record: WashRecordWithWorker) => void;
   onDelete: (id: string) => void;
   onTogglePayment: (id: string, received: boolean) => void;
+  onUpdateRecord: () => void;
   loading?: boolean;
 }
 
@@ -39,6 +41,7 @@ export default function WashRecordsTable({
   onEdit,
   onDelete,
   onTogglePayment,
+  onUpdateRecord,
   loading,
 }: WashRecordsTableProps) {
   const [search, setSearch] = useState("");
@@ -47,6 +50,10 @@ export default function WashRecordsTable({
   const [paymentFilter, setPaymentFilter] = useState<string>("ALL");
   const [togglingPayment, setTogglingPayment] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [uploadingProof, setUploadingProof] = useState<string | null>(null);
+  const [viewingProof, setViewingProof] = useState<{ url: string; plateNumber: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
   const filteredRecords = records.filter((record) => {
     const matchesSearch =
@@ -89,6 +96,44 @@ export default function WashRecordsTable({
     setTogglingPayment(null);
   };
 
+  const handleUploadClick = (recordId: string) => {
+    setSelectedRecordId(recordId);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedRecordId) return;
+
+    setUploadingProof(selectedRecordId);
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        
+        const response = await fetch(`/api/wash-records/${selectedRecordId}/proof`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ instapayProof: base64 }),
+        });
+
+        if (response.ok) {
+          onUpdateRecord();
+        }
+        setUploadingProof(null);
+        setSelectedRecordId(null);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Failed to upload proof:", error);
+      setUploadingProof(null);
+      setSelectedRecordId(null);
+    }
+
+    e.target.value = "";
+  };
+
   if (loading) {
     return (
       <div className="card p-12 text-center">
@@ -100,6 +145,15 @@ export default function WashRecordsTable({
 
   return (
     <div className="card overflow-hidden">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+      />
+
       <div className="p-4 border-b border-gray-100 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -165,6 +219,7 @@ export default function WashRecordsTable({
                   <th>Time</th>
                   <th>Payment</th>
                   <th>Amount</th>
+                  <th className="text-center">Proof</th>
                   <th className="text-center">Received</th>
                   <th>Status</th>
                   <th className="text-right">Actions</th>
@@ -210,6 +265,34 @@ export default function WashRecordsTable({
                       {record.amountPaid > 0 ? `${record.amountPaid} EGP` : "-"}
                       {record.tipAmount > 0 && (
                         <span className="text-green-600 text-xs ml-1">(+{record.tipAmount})</span>
+                      )}
+                    </td>
+                    <td className="text-center">
+                      {record.paymentType === "INSTAPAY" && (
+                        <>
+                          {record.instapayProof ? (
+                            <button
+                              onClick={() => setViewingProof({ url: record.instapayProof!, plateNumber: record.plateNumber })}
+                              className="w-8 h-8 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center mx-auto"
+                              title="View proof"
+                            >
+                              <Image className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleUploadClick(record.id)}
+                              disabled={uploadingProof === record.id}
+                              className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 hover:bg-amber-200 flex items-center justify-center mx-auto"
+                              title="Upload proof"
+                            >
+                              {uploadingProof === record.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Camera className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="text-center">
@@ -322,6 +405,15 @@ export default function WashRecordsTable({
             </div>
           )}
         </>
+      )}
+
+      {viewingProof && (
+        <ImageProofModal
+          isOpen={!!viewingProof}
+          onClose={() => setViewingProof(null)}
+          imageUrl={viewingProof.url}
+          plateNumber={viewingProof.plateNumber}
+        />
       )}
     </div>
   );
