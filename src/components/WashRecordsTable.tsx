@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { WashRecord, Worker } from "@prisma/client";
-import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle, ChevronLeft, ChevronRight, XCircle, Camera, Image } from "lucide-react";
+import { Search, Clock, CheckCircle, Edit2, Trash2, Loader2, Check, DollarSign, MessageCircle, ChevronLeft, ChevronRight, XCircle, Camera, Image, FolderOpen } from "lucide-react";
 import clsx from "clsx";
 import ImageProofModal from "./ImageProofModal";
 
@@ -52,7 +52,9 @@ export default function WashRecordsTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [uploadingProof, setUploadingProof] = useState<string | null>(null);
   const [viewingProof, setViewingProof] = useState<{ url: string; plateNumber: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showUploadMenu, setShowUploadMenu] = useState<string | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
   const filteredRecords = records.filter((record) => {
@@ -97,8 +99,19 @@ export default function WashRecordsTable({
   };
 
   const handleUploadClick = (recordId: string) => {
+    setShowUploadMenu(showUploadMenu === recordId ? null : recordId);
+  };
+
+  const handleCameraClick = (recordId: string) => {
     setSelectedRecordId(recordId);
-    fileInputRef.current?.click();
+    setShowUploadMenu(null);
+    cameraInputRef.current?.click();
+  };
+
+  const handleGalleryClick = (recordId: string) => {
+    setSelectedRecordId(recordId);
+    setShowUploadMenu(null);
+    galleryInputRef.current?.click();
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,10 +160,17 @@ export default function WashRecordsTable({
     <div className="card overflow-hidden">
       <input
         type="file"
-        ref={fileInputRef}
+        ref={cameraInputRef}
         onChange={handleFileChange}
         accept="image/*"
-        
+        capture="environment"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={galleryInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
         className="hidden"
       />
 
@@ -269,7 +289,7 @@ export default function WashRecordsTable({
                     </td>
                     <td className="text-center">
                       {record.paymentType === "INSTAPAY" && (
-                        <>
+                        <div className="relative inline-block">
                           {record.instapayProof ? (
                             <button
                               onClick={() => setViewingProof({ url: record.instapayProof!, plateNumber: record.plateNumber })}
@@ -279,20 +299,40 @@ export default function WashRecordsTable({
                               <Image className="w-4 h-4" />
                             </button>
                           ) : (
-                            <button
-                              onClick={() => handleUploadClick(record.id)}
-                              disabled={uploadingProof === record.id}
-                              className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 hover:bg-amber-200 flex items-center justify-center mx-auto"
-                              title="Upload proof"
-                            >
-                              {uploadingProof === record.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Camera className="w-4 h-4" />
+                            <>
+                              <button
+                                onClick={() => handleUploadClick(record.id)}
+                                disabled={uploadingProof === record.id}
+                                className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 hover:bg-amber-200 flex items-center justify-center mx-auto"
+                                title="Upload proof"
+                              >
+                                {uploadingProof === record.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Camera className="w-4 h-4" />
+                                )}
+                              </button>
+                              {showUploadMenu === record.id && (
+                                <div className="absolute z-10 top-full mt-1 right-0 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px]">
+                                  <button
+                                    onClick={() => handleCameraClick(record.id)}
+                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <Camera className="w-4 h-4 text-gray-600" />
+                                    Take Photo
+                                  </button>
+                                  <button
+                                    onClick={() => handleGalleryClick(record.id)}
+                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <FolderOpen className="w-4 h-4 text-gray-600" />
+                                    Choose from Gallery
+                                  </button>
+                                </div>
                               )}
-                            </button>
+                            </>
                           )}
-                        </>
+                        </div>
                       )}
                     </td>
                     <td className="text-center">
