@@ -27,29 +27,30 @@ export default function DashboardPage() {
 
   const isToday = selectedDate === new Date().toISOString().split("T")[0];
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchRecords = useCallback(async () => {
     try {
-      const [recordsRes, workersRes] = await Promise.all([
-        fetch(`/api/wash-records?date=${selectedDate}`),
-        fetch("/api/workers"),
-      ]);
-
-      const recordsData = await recordsRes.json();
-      const workersData = await workersRes.json();
-
-      if (recordsData.success) setRecords(recordsData.data);
-      if (workersData.success) setWorkers(workersData.data);
+      const response = await fetch(`/api/wash-records?date=${selectedDate}`);
+      const data = await response.json();
+      if (data.success) setRecords(data.data);
     } catch (error) {
-      console.error("Failed to fetch data:", error);
-    } finally {
-      setLoading(false);
+      console.error("Failed to fetch records:", error);
     }
   }, [selectedDate]);
 
+  const fetchWorkers = useCallback(async () => {
+    try {
+      const response = await fetch("/api/workers");
+      const data = await response.json();
+      if (data.success) setWorkers(data.data);
+    } catch (error) {
+      console.error("Failed to fetch workers:", error);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    setLoading(true);
+    Promise.all([fetchRecords(), fetchWorkers()]).finally(() => setLoading(false));
+  }, [fetchRecords, fetchWorkers]);
 
   const handleAddWorker = async (name: string): Promise<Worker> => {
     const response = await fetch("/api/workers", {
@@ -73,28 +74,36 @@ export default function DashboardPage() {
     if (!formattedPhone.startsWith("20")) {
       formattedPhone = "20" + formattedPhone;
     }
-    
     const message = encodeURIComponent("Hello! Your car is ready for pickup. Thank you for choosing VRoom CarWash!");
-    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
-    window.open(whatsappUrl, "_blank");
+    window.open(`https://wa.me/${formattedPhone}?text=${message}`, "_blank");
   };
 
-  const handleFinish = async (id: string, phoneNumber?: string | null) => {
+  const handleAddSuccess = (newRecord: WashRecordWithWorker) => {
+    setRecords((prev) => [newRecord, ...prev]);
+  };
+
+  const handleEditSuccess = (updatedRecord: WashRecordWithWorker) => {
+    setRecords((prev) => prev.map((r) => (r.id === updatedRecord.id ? updatedRecord : r)));
+  };
+
+  const handleFinish = (id: string) => {
     const record = records.find((r) => r.id === id);
-    if (record) {
-      setFinishingRecord(record);
-    }
+    if (record) setFinishingRecord(record);
   };
 
-  const handleFinishSuccess = () => {
+  const handleFinishSuccess = (updatedRecord: WashRecordWithWorker) => {
+    setRecords((prev) => prev.map((r) => (r.id === updatedRecord.id ? updatedRecord : r)));
     if (finishingRecord?.phoneNumber) {
       sendWhatsAppMessage(finishingRecord.phoneNumber);
     }
-    fetchData();
   };
 
   const handleCancel = (record: WashRecordWithWorker) => {
     setCancellingRecord(record);
+  };
+
+  const handleCancelSuccess = (updatedRecord: WashRecordWithWorker) => {
+    setRecords((prev) => prev.map((r) => (r.id === updatedRecord.id ? updatedRecord : r)));
   };
 
   const handleDelete = (id: string) => {
@@ -102,22 +111,26 @@ export default function DashboardPage() {
     if (record) setDeletingRecord(record);
   };
 
+  const handleDeleteSuccess = (deletedId: string) => {
+    setRecords((prev) => prev.filter((r) => r.id !== deletedId));
+  };
+
   const handleTogglePayment = async (id: string, received: boolean) => {
+    setRecords((prev) => prev.map((r) => (r.id === id ? { ...r, paymentReceived: received } : r)));
     try {
-      const response = await fetch(`/api/wash-records/${id}/payment`, {
+      await fetch(`/api/wash-records/${id}/payment`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paymentReceived: received }),
       });
-
-      if (response.ok) {
-        setRecords((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, paymentReceived: received } : r))
-        );
-      }
     } catch (error) {
+      setRecords((prev) => prev.map((r) => (r.id === id ? { ...r, paymentReceived: !received } : r)));
       console.error("Failed to toggle payment:", error);
     }
+  };
+
+  const handleProofUpdate = (updatedRecord: WashRecordWithWorker) => {
+    setRecords((prev) => prev.map((r) => (r.id === updatedRecord.id ? updatedRecord : r)));
   };
 
   const handleExport = async () => {
@@ -170,10 +183,7 @@ export default function DashboardPage() {
             {isToday ? "Today's Dashboard" : "Dashboard"}
           </h1>
           <div className="flex items-center gap-2 mt-1">
-            <button
-              onClick={() => navigateDate("prev")}
-              className="p-1 hover:bg-gray-100 rounded"
-            >
+            <button onClick={() => navigateDate("prev")} className="p-1 hover:bg-gray-100 rounded">
               <ChevronLeft className="w-5 h-5 text-gray-500" />
             </button>
             <div className="flex items-center gap-2">
@@ -185,17 +195,11 @@ export default function DashboardPage() {
                 className="text-gray-600 border-none bg-transparent cursor-pointer hover:text-gray-900"
               />
             </div>
-            <button
-              onClick={() => navigateDate("next")}
-              className="p-1 hover:bg-gray-100 rounded"
-            >
+            <button onClick={() => navigateDate("next")} className="p-1 hover:bg-gray-100 rounded">
               <ChevronRight className="w-5 h-5 text-gray-500" />
             </button>
             {!isToday && (
-              <button
-                onClick={goToToday}
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium ml-2"
-              >
+              <button onClick={goToToday} className="text-sm text-primary-600 hover:text-primary-700 font-medium ml-2">
                 Go to Today
               </button>
             )}
@@ -230,14 +234,14 @@ export default function DashboardPage() {
         onEdit={setEditingRecord}
         onDelete={handleDelete}
         onTogglePayment={handleTogglePayment}
-        onUpdateRecord={fetchData}
+        onProofUpdate={handleProofUpdate}
         loading={loading}
       />
 
       <AddCarModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onSuccess={fetchData}
+        onSuccess={handleAddSuccess}
         workers={workers}
         onAddWorker={handleAddWorker}
       />
@@ -246,7 +250,7 @@ export default function DashboardPage() {
         <EditCarModal
           isOpen={!!editingRecord}
           onClose={() => setEditingRecord(null)}
-          onSuccess={fetchData}
+          onSuccess={handleEditSuccess}
           record={editingRecord}
           workers={workers}
         />
@@ -262,14 +266,14 @@ export default function DashboardPage() {
       <CancelModal
         isOpen={!!cancellingRecord}
         onClose={() => setCancellingRecord(null)}
-        onSuccess={fetchData}
+        onSuccess={handleCancelSuccess}
         record={cancellingRecord}
       />
 
       <DeleteConfirmModal
         isOpen={!!deletingRecord}
         onClose={() => setDeletingRecord(null)}
-        onSuccess={fetchData}
+        onSuccess={() => handleDeleteSuccess(deletingRecord!.id)}
         record={deletingRecord}
       />
     </div>

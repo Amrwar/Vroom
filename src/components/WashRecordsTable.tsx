@@ -15,7 +15,7 @@ interface WashRecordsTableProps {
   onEdit: (record: WashRecordWithWorker) => void;
   onDelete: (id: string) => void;
   onTogglePayment: (id: string, received: boolean) => void;
-  onUpdateRecord: () => void;
+  onProofUpdate: (record: WashRecordWithWorker) => void;
   loading?: boolean;
 }
 
@@ -41,7 +41,7 @@ export default function WashRecordsTable({
   onEdit,
   onDelete,
   onTogglePayment,
-  onUpdateRecord,
+  onProofUpdate,
   loading,
 }: WashRecordsTableProps) {
   const [search, setSearch] = useState("");
@@ -80,16 +80,8 @@ export default function WashRecordsTable({
     setCurrentPage(1);
   };
 
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-    setCurrentPage(1);
-  };
-
   const formatTime = (date: Date) => {
-    return new Date(date).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return new Date(date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   };
 
   const handleTogglePayment = async (id: string, currentStatus: boolean) => {
@@ -119,20 +111,24 @@ export default function WashRecordsTable({
     if (!file || !selectedRecordId) return;
 
     setUploadingProof(selectedRecordId);
+    const recordId = selectedRecordId;
 
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
         
-        const response = await fetch(`/api/wash-records/${selectedRecordId}/proof`, {
+        const response = await fetch(`/api/wash-records/${recordId}/proof`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ instapayProof: base64 }),
         });
 
         if (response.ok) {
-          onUpdateRecord();
+          const data = await response.json();
+          if (data.success) {
+            onProofUpdate(data.data);
+          }
         }
         setUploadingProof(null);
         setSelectedRecordId(null);
@@ -158,21 +154,8 @@ export default function WashRecordsTable({
 
   return (
     <div className="card overflow-hidden">
-      <input
-        type="file"
-        ref={cameraInputRef}
-        onChange={handleFileChange}
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-      />
-      <input
-        type="file"
-        ref={galleryInputRef}
-        onChange={handleFileChange}
-        accept="image/*"
-        className="hidden"
-      />
+      <input type="file" ref={cameraInputRef} onChange={handleFileChange} accept="image/*" capture="environment" className="hidden" />
+      <input type="file" ref={galleryInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
 
       <div className="p-4 border-b border-gray-100 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -183,36 +166,24 @@ export default function WashRecordsTable({
               placeholder="Search plate, car type, or phone..."
               className="input pl-10"
               value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
             />
           </div>
           <div className="flex gap-2">
-            <select
-              className="select"
-              value={statusFilter}
-              onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
-            >
+            <select className="select" value={statusFilter} onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}>
               <option value="ALL">All Status</option>
               <option value="IN_PROGRESS">In Progress</option>
               <option value="FINISHED">Finished</option>
               <option value="CANCELLED">Left/Cancelled</option>
             </select>
-            <select
-              className="select"
-              value={typeFilter}
-              onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)}
-            >
+            <select className="select" value={typeFilter} onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)}>
               <option value="ALL">All Types</option>
               <option value="INNER">Inner</option>
               <option value="OUTER">Outer</option>
               <option value="FULL">Full</option>
               <option value="FREE">Free</option>
             </select>
-            <select
-              className="select"
-              value={paymentFilter}
-              onChange={(e) => handleFilterChange(setPaymentFilter, e.target.value)}
-            >
+            <select className="select" value={paymentFilter} onChange={(e) => handleFilterChange(setPaymentFilter, e.target.value)}>
               <option value="ALL">All Payments</option>
               <option value="RECEIVED">Received</option>
               <option value="PENDING">Pending</option>
@@ -250,9 +221,7 @@ export default function WashRecordsTable({
                   <tr key={record.id} className={clsx("animate-fade-in", record.status === "CANCELLED" && "bg-red-50")}>
                     <td className="font-medium text-gray-900">
                       <span className="flex items-center gap-2">
-                        {record.status === "CANCELLED" && (
-                          <span title="Left without completing"><XCircle className="w-4 h-4 text-red-500" /></span>
-                        )}
+                        {record.status === "CANCELLED" && <span title="Left without completing"><XCircle className="w-4 h-4 text-red-500" /></span>}
                         {record.plateNumber}
                       </span>
                     </td>
@@ -265,27 +234,17 @@ export default function WashRecordsTable({
                         </span>
                       ) : "-"}
                     </td>
-                    <td>
-                      <span className={`badge ${washTypeColors[record.washType]}`}>
-                        {record.washType}
-                      </span>
-                    </td>
+                    <td><span className={`badge ${washTypeColors[record.washType]}`}>{record.washType}</span></td>
                     <td className="text-gray-600">{record.worker?.name || "-"}</td>
                     <td className="text-gray-600">{formatTime(record.entryTime)}</td>
                     <td>
                       {record.paymentType ? (
-                        <span className={`badge ${record.paymentType === "CASH" ? "badge-green" : "badge-blue"}`}>
-                          {record.paymentType}
-                        </span>
-                      ) : (
-                        "-"
-                      )}
+                        <span className={`badge ${record.paymentType === "CASH" ? "badge-green" : "badge-blue"}`}>{record.paymentType}</span>
+                      ) : "-"}
                     </td>
                     <td className="text-gray-900">
                       {record.amountPaid > 0 ? `${record.amountPaid} EGP` : "-"}
-                      {record.tipAmount > 0 && (
-                        <span className="text-green-600 text-xs ml-1">(+{record.tipAmount})</span>
-                      )}
+                      {record.tipAmount > 0 && <span className="text-green-600 text-xs ml-1">(+{record.tipAmount})</span>}
                     </td>
                     <td className="text-center">
                       {record.paymentType === "INSTAPAY" && (
@@ -306,25 +265,15 @@ export default function WashRecordsTable({
                                 className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 hover:bg-amber-200 flex items-center justify-center mx-auto"
                                 title="Upload proof"
                               >
-                                {uploadingProof === record.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Camera className="w-4 h-4" />
-                                )}
+                                {uploadingProof === record.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                               </button>
                               {showUploadMenu === record.id && (
                                 <div className="absolute z-10 top-full mt-1 right-0 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[140px]">
-                                  <button
-                                    onClick={() => handleCameraClick(record.id)}
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                                  >
+                                  <button onClick={() => handleCameraClick(record.id)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
                                     <Camera className="w-4 h-4 text-gray-600" />
                                     Take Photo
                                   </button>
-                                  <button
-                                    onClick={() => handleGalleryClick(record.id)}
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                                  >
+                                  <button onClick={() => handleGalleryClick(record.id)} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
                                     <FolderOpen className="w-4 h-4 text-gray-600" />
                                     Choose from Gallery
                                   </button>
@@ -342,59 +291,31 @@ export default function WashRecordsTable({
                           disabled={togglingPayment === record.id}
                           className={clsx(
                             "w-8 h-8 rounded-full flex items-center justify-center transition-all",
-                            record.paymentReceived
-                              ? "bg-green-100 text-green-600 hover:bg-green-200"
-                              : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                            record.paymentReceived ? "bg-green-100 text-green-600 hover:bg-green-200" : "bg-gray-100 text-gray-400 hover:bg-gray-200"
                           )}
                           title={record.paymentReceived ? "Payment received" : "Mark as received"}
                         >
-                          {togglingPayment === record.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : record.paymentReceived ? (
-                            <Check className="w-4 h-4" />
-                          ) : (
-                            <DollarSign className="w-4 h-4" />
-                          )}
+                          {togglingPayment === record.id ? <Loader2 className="w-4 h-4 animate-spin" /> : record.paymentReceived ? <Check className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
                         </button>
                       )}
                     </td>
-                    <td>
-                      <span className={`badge ${statusColors[record.status]}`}>
-                        {record.status === "IN_PROGRESS" ? "In Progress" : record.status === "FINISHED" ? "Finished" : "Left"}
-                      </span>
-                    </td>
+                    <td><span className={`badge ${statusColors[record.status]}`}>{record.status === "IN_PROGRESS" ? "In Progress" : record.status === "FINISHED" ? "Finished" : "Left"}</span></td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
                         {record.status === "IN_PROGRESS" && (
                           <>
-                            <button
-                              onClick={() => onFinish(record.id, record.phoneNumber)}
-                              className="btn btn-sm btn-ghost text-green-600 hover:bg-green-50"
-                              title="Finish"
-                            >
+                            <button onClick={() => onFinish(record.id, record.phoneNumber)} className="btn btn-sm btn-ghost text-green-600 hover:bg-green-50" title="Finish">
                               <CheckCircle className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => onCancel(record)}
-                              className="btn btn-sm btn-ghost text-amber-600 hover:bg-amber-50"
-                              title="Mark as Left"
-                            >
+                            <button onClick={() => onCancel(record)} className="btn btn-sm btn-ghost text-amber-600 hover:bg-amber-50" title="Mark as Left">
                               <XCircle className="w-4 h-4" />
                             </button>
                           </>
                         )}
-                        <button
-                          onClick={() => onEdit(record)}
-                          className="btn btn-sm btn-ghost text-blue-600 hover:bg-blue-50"
-                          title="Edit"
-                        >
+                        <button onClick={() => onEdit(record)} className="btn btn-sm btn-ghost text-blue-600 hover:bg-blue-50" title="Edit">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => onDelete(record.id)}
-                          className="btn btn-sm btn-ghost text-red-600 hover:bg-red-50"
-                          title="Delete"
-                        >
+                        <button onClick={() => onDelete(record.id)} className="btn btn-sm btn-ghost text-red-600 hover:bg-red-50" title="Delete">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -411,11 +332,7 @@ export default function WashRecordsTable({
                 Showing {startIndex + 1} to {Math.min(startIndex + ITEMS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length} records
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <div className="flex items-center gap-1">
@@ -423,22 +340,13 @@ export default function WashRecordsTable({
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={clsx(
-                        "w-8 h-8 rounded-lg text-sm font-medium",
-                        currentPage === page
-                          ? "bg-red-600 text-white"
-                          : "hover:bg-gray-100 text-gray-600"
-                      )}
+                      className={clsx("w-8 h-8 rounded-lg text-sm font-medium", currentPage === page ? "bg-red-600 text-white" : "hover:bg-gray-100 text-gray-600")}
                     >
                       {page}
                     </button>
                   ))}
                 </div>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
@@ -448,12 +356,7 @@ export default function WashRecordsTable({
       )}
 
       {viewingProof && (
-        <ImageProofModal
-          isOpen={!!viewingProof}
-          onClose={() => setViewingProof(null)}
-          imageUrl={viewingProof.url}
-          plateNumber={viewingProof.plateNumber}
-        />
+        <ImageProofModal isOpen={!!viewingProof} onClose={() => setViewingProof(null)} imageUrl={viewingProof.url} plateNumber={viewingProof.plateNumber} />
       )}
     </div>
   );

@@ -8,7 +8,7 @@ import { Loader2, CheckCircle } from 'lucide-react';
 interface FinishModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (record: WashRecordWithWorker) => void;
   record: WashRecordWithWorker | null;
 }
 

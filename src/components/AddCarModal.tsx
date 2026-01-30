@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Modal from "./Modal";
-import { Worker } from "@prisma/client";
+import { WashRecord, Worker } from "@prisma/client";
 import { Plus, Loader2, Phone } from "lucide-react";
 
+type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 type WashType = "INNER" | "OUTER" | "FREE" | "FULL";
 type PaymentType = "CASH" | "INSTAPAY";
 
 interface AddCarModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (record: WashRecordWithWorker) => void;
   workers: Worker[];
   onAddWorker: (name: string) => Promise<Worker>;
 }
@@ -98,11 +99,9 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-
     if (!formData.plateNumber.trim()) {
       newErrors.plateNumber = "Plate number is required";
     }
-
     if (!isFreeWash) {
       if (!formData.paymentType) {
         newErrors.paymentType = "Payment type is required";
@@ -111,7 +110,6 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
         newErrors.amountPaid = "Amount must be greater than 0";
       }
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -138,11 +136,11 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
         }),
       });
 
-      if (response.ok) {
-        onSuccess();
+      const data = await response.json();
+      if (response.ok && data.success) {
+        onSuccess(data.data);
         onClose();
       } else {
-        const data = await response.json();
         setErrors({ submit: data.error || "Failed to add car" });
       }
     } catch {
@@ -154,7 +152,6 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
 
   const handleAddWorker = async () => {
     if (!newWorkerName.trim()) return;
-
     setAddingWorker(true);
     try {
       const worker = await onAddWorker(newWorkerName.trim());
@@ -247,16 +244,10 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
               >
                 <option value="">Select worker...</option>
                 {activeWorkers.map((worker) => (
-                  <option key={worker.id} value={worker.id}>
-                    {worker.name}
-                  </option>
+                  <option key={worker.id} value={worker.id}>{worker.name}</option>
                 ))}
               </select>
-              <button
-                type="button"
-                onClick={() => setShowNewWorker(true)}
-                className="btn btn-secondary"
-              >
+              <button type="button" onClick={() => setShowNewWorker(true)} className="btn btn-secondary">
                 <Plus className="w-4 h-4" />
               </button>
             </div>
@@ -346,9 +337,7 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
 
         {isFreeWash && (
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-sm text-gray-600">
-              Free wash selected - no payment required.
-            </p>
+            <p className="text-sm text-gray-600">Free wash selected - no payment required.</p>
           </div>
         )}
 
@@ -370,18 +359,10 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
         )}
 
         <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-secondary flex-1"
-          >
+          <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary flex-1"
-          >
+          <button type="submit" disabled={loading} className="btn btn-primary flex-1">
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
