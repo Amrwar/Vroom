@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { WashRecord, Worker } from "@prisma/client";
 import AddCarModal from "@/components/AddCarModal";
 import EditCarModal from "@/components/EditCarModal";
@@ -24,16 +24,20 @@ export default function DashboardPage() {
   const [deletingRecord, setDeletingRecord] = useState<WashRecordWithWorker | null>(null);
   const [exporting, setExporting] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const initialLoadDone = useRef(false);
 
   const isToday = selectedDate === new Date().toISOString().split("T")[0];
 
-  const fetchRecords = useCallback(async () => {
+  const fetchRecords = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const response = await fetch(`/api/wash-records?date=${selectedDate}`);
       const data = await response.json();
       if (data.success) setRecords(data.data);
     } catch (error) {
       console.error("Failed to fetch records:", error);
+    } finally {
+      if (showLoading) setLoading(false);
     }
   }, [selectedDate]);
 
@@ -48,8 +52,17 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchRecords(), fetchWorkers()]).finally(() => setLoading(false));
+    const loadData = async () => {
+      if (!initialLoadDone.current) {
+        setLoading(true);
+        await Promise.all([fetchRecords(), fetchWorkers()]);
+        setLoading(false);
+        initialLoadDone.current = true;
+      } else {
+        fetchRecords();
+      }
+    };
+    loadData();
   }, [fetchRecords, fetchWorkers]);
 
   const handleAddWorker = async (name: string): Promise<Worker> => {
