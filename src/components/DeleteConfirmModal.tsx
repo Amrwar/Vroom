@@ -1,9 +1,11 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Modal from './Modal';
-import { WashRecordWithWorker } from '@/types';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { useState } from "react";
+import Modal from "./Modal";
+import { WashRecord, Worker } from "@prisma/client";
+import { Loader2, Trash2 } from "lucide-react";
+
+type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
@@ -14,17 +16,17 @@ interface DeleteConfirmModalProps {
 
 export default function DeleteConfirmModal({ isOpen, onClose, onSuccess, record }: DeleteConfirmModalProps) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleDelete = async () => {
     if (!record) return;
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const response = await fetch(`/api/wash-records/${record.id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (response.ok) {
@@ -32,10 +34,10 @@ export default function DeleteConfirmModal({ isOpen, onClose, onSuccess, record 
         onClose();
       } else {
         const data = await response.json();
-        setError(data.error || 'Failed to delete record');
+        setError(data.error || "Failed to delete record");
       }
     } catch {
-      setError('Failed to delete record');
+      setError("Failed to delete record");
     } finally {
       setLoading(false);
     }
@@ -45,16 +47,18 @@ export default function DeleteConfirmModal({ isOpen, onClose, onSuccess, record 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Delete Record" size="sm">
-      <div className="space-y-5">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-6 h-6 text-red-600" />
+      <div className="space-y-4">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Trash2 className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-red-800">Delete this record?</p>
+              <p className="text-sm text-red-700 mt-1">
+                {record.plateNumber} - {record.washType} wash
+              </p>
+              <p className="text-xs text-red-600 mt-2">This action cannot be undone.</p>
+            </div>
           </div>
-          <p className="text-gray-700">
-            Are you sure you want to delete the record for{' '}
-            <strong className="text-gray-900">{record.plateNumber}</strong>?
-          </p>
-          <p className="text-sm text-gray-500 mt-2">This action cannot be undone.</p>
         </div>
 
         {error && (
@@ -64,18 +68,9 @@ export default function DeleteConfirmModal({ isOpen, onClose, onSuccess, record 
         )}
 
         <div className="flex gap-3">
-          <button onClick={onClose} className="btn btn-secondary flex-1">
-            Cancel
-          </button>
+          <button onClick={onClose} className="btn btn-secondary flex-1">Cancel</button>
           <button onClick={handleDelete} disabled={loading} className="btn btn-danger flex-1">
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Deleting...
-              </>
-            ) : (
-              'Delete'
-            )}
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Deleting...</> : "Delete"}
           </button>
         </div>
       </div>

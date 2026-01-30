@@ -11,7 +11,7 @@ type PaymentType = "CASH" | "INSTAPAY";
 interface CancelModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (record: WashRecordWithWorker) => void;
   record: WashRecordWithWorker | null;
 }
 
@@ -56,11 +56,11 @@ export default function CancelModal({ isOpen, onClose, onSuccess, record }: Canc
         }),
       });
 
-      if (response.ok) {
-        onSuccess();
+      const data = await response.json();
+      if (response.ok && data.success) {
+        onSuccess(data.data);
         onClose();
       } else {
-        const data = await response.json();
         setErrors({ submit: data.error || "Failed to cancel record" });
       }
     } catch {
@@ -79,12 +79,8 @@ export default function CancelModal({ isOpen, onClose, onSuccess, record }: Canc
           <div className="flex items-start gap-3">
             <XCircle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-amber-800">
-                Mark {record.plateNumber} as left?
-              </p>
-              <p className="text-sm text-amber-700 mt-1">
-                Original: {record.washType} wash ({record.amountPaid} EGP)
-              </p>
+              <p className="font-medium text-amber-800">Mark {record.plateNumber} as left?</p>
+              <p className="text-sm text-amber-700 mt-1">Original: {record.washType} wash ({record.amountPaid} EGP)</p>
             </div>
           </div>
         </div>
@@ -143,21 +139,9 @@ export default function CancelModal({ isOpen, onClose, onSuccess, record }: Canc
         )}
 
         <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
-            Go Back
-          </button>
+          <button type="button" onClick={onClose} className="btn btn-secondary flex-1">Go Back</button>
           <button type="submit" disabled={loading} className="btn btn-danger flex-1">
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <XCircle className="w-4 h-4" />
-                Mark as Left
-              </>
-            )}
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Processing...</> : <><XCircle className="w-4 h-4" />Mark as Left</>}
           </button>
         </div>
       </form>
