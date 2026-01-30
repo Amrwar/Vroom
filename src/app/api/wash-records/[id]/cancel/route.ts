@@ -10,13 +10,16 @@ export async function POST(
     const body = await request.json();
     const { amountPaid, paymentType, notes } = body;
 
+    const paidAmount = amountPaid ?? 0;
+
     const record = await prisma.washRecord.update({
       where: { id },
       data: {
         status: "CANCELLED",
         finishTime: new Date(),
-        amountPaid: amountPaid ?? 0,
-        paymentType: paymentType || null,
+        amountPaid: paidAmount,
+        paymentType: paidAmount > 0 ? paymentType : null,
+        paymentReceived: paidAmount > 0,
         notes: notes || null,
       },
       include: { worker: true },
