@@ -150,7 +150,7 @@ export default function WashRecordsTable({
         ref={fileInputRef}
         onChange={handleFileChange}
         accept="image/*"
-        capture="environment"
+        
         className="hidden"
       />
 
