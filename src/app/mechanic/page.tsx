@@ -15,14 +15,17 @@ import {
   Loader2,
   Droplets,
   Filter,
+  Settings,
 } from "lucide-react";
 import clsx from "clsx";
-import AddMechanicModal from "@/components/AddMechanicModal";
+import AddOilServiceModal from "@/components/AddOilServiceModal";
+import AddOtherServiceModal from "@/components/AddOtherServiceModal";
 
 export default function MechanicPage() {
   const [records, setRecords] = useState<MechanicRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showOilModal, setShowOilModal] = useState(false);
+  const [showOtherModal, setShowOtherModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingPayment, setTogglingPayment] = useState<string | null>(null);
@@ -104,15 +107,21 @@ export default function MechanicPage() {
     }
   };
 
-  const formatServiceType = (type: string) => {
+  const formatServiceType = (type: string | null) => {
+    if (!type) return "-";
     return type === "OIL_ONLY" ? "Oil Only" : "Oil + Filter";
   };
+
+  const oilRecords = records.filter((r) => r.category === "OIL_SERVICE");
+  const otherRecords = records.filter((r) => r.category === "OTHER_SERVICE");
 
   const stats = {
     total: records.length,
     totalRevenue: records.reduce((sum, r) => sum + r.totalAmount, 0),
-    oilRevenue: records.reduce((sum, r) => sum + r.oilPrice, 0),
-    laborRevenue: records.reduce((sum, r) => sum + r.laborCost + r.filterPrice, 0),
+    oilServices: oilRecords.length,
+    oilRevenue: oilRecords.reduce((sum, r) => sum + r.totalAmount, 0),
+    otherServices: otherRecords.length,
+    otherRevenue: otherRecords.reduce((sum, r) => sum + r.totalAmount, 0),
     received: records.filter((r) => r.paymentReceived).reduce((sum, r) => sum + r.totalAmount, 0),
   };
 
@@ -150,17 +159,25 @@ export default function MechanicPage() {
             )}
           </div>
         </div>
-        <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
-          <Plus className="w-4 h-4" />
-          Add Service
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowOilModal(true)} className="btn btn-primary">
+            <Droplets className="w-4 h-4" />
+            Oil Service
+          </button>
+          <button onClick={() => setShowOtherModal(true)} className="btn btn-secondary">
+            <Settings className="w-4 h-4" />
+            Other Service
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <StatsCard title="Total Services" value={stats.total} icon={Wrench} color="blue" />
         <StatsCard title="Total Revenue" value={`${stats.totalRevenue} EGP`} icon={DollarSign} color="purple" />
-        <StatsCard title="Oil Sales" value={`${stats.oilRevenue} EGP`} icon={Droplets} color="yellow" />
-        <StatsCard title="Labor + Filters" value={`${stats.laborRevenue} EGP`} icon={Filter} color="gray" />
+        <StatsCard title="Oil Services" value={stats.oilServices} icon={Droplets} color="yellow" />
+        <StatsCard title="Oil Revenue" value={`${stats.oilRevenue} EGP`} icon={Droplets} color="amber" />
+        <StatsCard title="Other Services" value={stats.otherServices} icon={Settings} color="gray" />
+        <StatsCard title="Other Revenue" value={`${stats.otherRevenue} EGP`} icon={Settings} color="slate" />
         <StatsCard title="Received" value={`${stats.received} EGP`} icon={Check} color="green" />
       </div>
 
@@ -183,11 +200,9 @@ export default function MechanicPage() {
                   <th>Time</th>
                   <th>Plate</th>
                   <th>Car Type</th>
-                  <th>Oil</th>
+                  <th>Category</th>
                   <th>Service</th>
-                  <th>Oil Price</th>
-                  <th>Labor</th>
-                  <th>Filter</th>
+                  <th>Details</th>
                   <th>Total</th>
                   <th>Payment</th>
                   <th className="text-center">Received</th>
@@ -203,24 +218,34 @@ export default function MechanicPage() {
                     <td>
                       <span className={clsx(
                         "badge",
-                        record.oilType === "SHELL_4L" ? "badge-blue" :
-                        record.oilType === "SHELL_5L" ? "badge-purple" :
-                        "badge-gray"
+                        record.category === "OIL_SERVICE" ? "badge-yellow" : "badge-purple"
                       )}>
-                        {formatOilType(record.oilType)}
+                        {record.category === "OIL_SERVICE" ? "Oil" : "Other"}
                       </span>
                     </td>
                     <td>
-                      <span className={clsx(
-                        "badge",
-                        record.serviceType === "OIL_ONLY" ? "badge-yellow" : "badge-green"
-                      )}>
-                        {formatServiceType(record.serviceType)}
-                      </span>
+                      {record.category === "OIL_SERVICE" ? (
+                        <span className={clsx(
+                          "badge",
+                          record.serviceType === "OIL_ONLY" ? "badge-blue" : "badge-green"
+                        )}>
+                          {formatServiceType(record.serviceType)}
+                        </span>
+                      ) : (
+                        <span className="font-medium text-gray-900">{record.serviceName}</span>
+                      )}
                     </td>
-                    <td className="text-gray-900">{record.oilPrice > 0 ? `${record.oilPrice} EGP` : "-"}</td>
-                    <td className="text-gray-900">{record.laborCost} EGP</td>
-                    <td className="text-gray-900">{record.filterPrice > 0 ? `${record.filterPrice} EGP` : "-"}</td>
+                    <td className="text-gray-600 text-sm">
+                      {record.category === "OIL_SERVICE" ? (
+                        <div>
+                          <div>{formatOilType(record.oilType)}: {record.oilPrice} EGP</div>
+                          <div>Labor: {record.laborCost} EGP</div>
+                          {record.filterPrice > 0 && <div>Filter: {record.filterPrice} EGP</div>}
+                        </div>
+                      ) : (
+                        <div>{record.servicePrice} EGP</div>
+                      )}
+                    </td>
                     <td className="font-semibold text-gray-900">{record.totalAmount} EGP</td>
                     <td>
                       {record.paymentType && (
@@ -273,9 +298,15 @@ export default function MechanicPage() {
         )}
       </div>
 
-      <AddMechanicModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
+      <AddOilServiceModal
+        isOpen={showOilModal}
+        onClose={() => setShowOilModal(false)}
+        onSuccess={handleAddSuccess}
+      />
+
+      <AddOtherServiceModal
+        isOpen={showOtherModal}
+        onClose={() => setShowOtherModal(false)}
         onSuccess={handleAddSuccess}
       />
     </div>

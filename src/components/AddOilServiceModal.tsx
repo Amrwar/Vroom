@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { MechanicRecord } from "@prisma/client";
-import { Loader2, Wrench } from "lucide-react";
+import { Loader2, Droplets } from "lucide-react";
 
 type OilType = "SHELL_4L" | "SHELL_5L" | "CUSTOMER_OWN";
 type ServiceType = "OIL_ONLY" | "OIL_AND_FILTER";
 type PaymentType = "CASH" | "INSTAPAY";
 
-interface AddMechanicModalProps {
+interface AddOilServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (record: MechanicRecord) => void;
@@ -42,7 +42,7 @@ const paymentTypes: { value: PaymentType; label: string }[] = [
   { value: "INSTAPAY", label: "InstaPay" },
 ];
 
-export default function AddMechanicModal({ isOpen, onClose, onSuccess }: AddMechanicModalProps) {
+export default function AddOilServiceModal({ isOpen, onClose, onSuccess }: AddOilServiceModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     plateNumber: "",
@@ -105,6 +105,7 @@ export default function AddMechanicModal({ isOpen, onClose, onSuccess }: AddMech
           plateNumber: formData.plateNumber.trim().toUpperCase(),
           carType: formData.carType.trim() || null,
           phoneNumber: formData.phoneNumber.trim() || null,
+          category: "OIL_SERVICE",
           oilType: formData.oilType,
           oilPrice,
           serviceType: formData.serviceType,
@@ -131,7 +132,7 @@ export default function AddMechanicModal({ isOpen, onClose, onSuccess }: AddMech
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Mechanic Service" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Add Oil Service" size="lg">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -288,7 +289,7 @@ export default function AddMechanicModal({ isOpen, onClose, onSuccess }: AddMech
               </>
             ) : (
               <>
-                <Wrench className="w-4 h-4" />
+                <Droplets className="w-4 h-4" />
                 Add Service
               </>
             )}
