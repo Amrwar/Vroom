@@ -1,4 +1,4 @@
-generator client {
+﻿generator client {
   provider = "prisma-client-js"
 }
 
@@ -47,6 +47,27 @@ model WashRecord {
   @@index([paymentReceived])
 }
 
+model MechanicRecord {
+  id              String       @id @default(uuid())
+  plateNumber     String
+  carType         String?
+  phoneNumber     String?
+  oilType         OilType?
+  oilPrice        Float        @default(0)
+  serviceType     ServiceType
+  laborCost       Float        @default(0)
+  filterPrice     Float        @default(0)
+  totalAmount     Float        @default(0)
+  paymentType     PaymentType?
+  paymentReceived Boolean      @default(false)
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([createdAt])
+  @@index([plateNumber])
+}
+
 enum WashType {
   INNER
   OUTER
@@ -63,4 +84,15 @@ enum Status {
   IN_PROGRESS
   FINISHED
   CANCELLED
+}
+
+enum OilType {
+  SHELL_4L
+  SHELL_5L
+  CUSTOMER_OWN
+}
+
+enum ServiceType {
+  OIL_ONLY
+  OIL_AND_FILTER
 }
