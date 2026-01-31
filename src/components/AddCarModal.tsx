@@ -1,13 +1,29 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Modal from "./Modal";
 import { WashRecord, Worker } from "@prisma/client";
-import { Plus, Loader2, Phone } from "lucide-react";
+import { Plus, Loader2, Phone, Star, User, Calendar, Award } from "lucide-react";
 
 type WashRecordWithWorker = WashRecord & { worker: Worker | null };
 type WashType = "INNER" | "OUTER" | "FREE" | "FULL";
 type PaymentType = "CASH" | "INSTAPAY";
+
+interface CustomerInfo {
+  plateNumber: string;
+  carType: string | null;
+  phoneNumber: string | null;
+  totalVisits: number;
+  totalSpent: number;
+  lastVisit: string;
+  favoriteWashType: string;
+  isVIP: boolean;
+  recentVisits: Array<{
+    washType: string;
+    amountPaid: number;
+    entryTime: string;
+  }>;
+}
 
 interface AddCarModalProps {
   isOpen: boolean;
@@ -41,6 +57,8 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
   const [showNewWorker, setShowNewWorker] = useState(false);
   const [newWorkerName, setNewWorkerName] = useState("");
   const [addingWorker, setAddingWorker] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
 
   const [formData, setFormData] = useState({
     plateNumber: "",
@@ -55,6 +73,39 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const searchCustomer = useCallback(async (plate: string) => {
+    if (plate.length < 2) {
+      setCustomerInfo(null);
+      return;
+    }
+
+    setSearchingCustomer(true);
+    try {
+      const response = await fetch(`/api/customers/search?plate=${encodeURIComponent(plate)}`);
+      const data = await response.json();
+      if (data.success && data.data) {
+        setCustomerInfo(data.data);
+      } else {
+        setCustomerInfo(null);
+      }
+    } catch (error) {
+      console.error("Failed to search customer:", error);
+      setCustomerInfo(null);
+    } finally {
+      setSearchingCustomer(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.plateNumber) {
+        searchCustomer(formData.plateNumber);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formData.plateNumber, searchCustomer]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -72,8 +123,20 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
       setErrors({});
       setShowNewWorker(false);
       setNewWorkerName("");
+      setCustomerInfo(null);
     }
   }, [isOpen]);
+
+  const handleApplyCustomerInfo = () => {
+    if (!customerInfo) return;
+    
+    setFormData((prev) => ({
+      ...prev,
+      plateNumber: customerInfo.plateNumber,
+      carType: customerInfo.carType || prev.carType,
+      phoneNumber: customerInfo.phoneNumber || prev.phoneNumber,
+    }));
+  };
 
   const handleWashTypeChange = (washType: WashType) => {
     const price = WASH_PRICES[washType];
@@ -167,20 +230,32 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
 
   const activeWorkers = workers.filter((w) => w.isActive);
 
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Add New Car" size="lg">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">Plate Number *</label>
-            <input
-              type="text"
-              className="input uppercase"
-              placeholder="ABC 1234"
-              value={formData.plateNumber}
-              onChange={(e) => setFormData({ ...formData, plateNumber: e.target.value.toUpperCase() })}
-              autoFocus
-            />
+            <div className="relative">
+              <input
+                type="text"
+                className="input uppercase"
+                placeholder="ABC 1234"
+                value={formData.plateNumber}
+                onChange={(e) => setFormData({ ...formData, plateNumber: e.target.value.toUpperCase() })}
+                autoFocus
+              />
+              {searchingCustomer && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                </div>
+              )}
+            </div>
             {errors.plateNumber && <p className="text-sm text-red-500 mt-1">{errors.plateNumber}</p>}
           </div>
           <div>
@@ -194,6 +269,44 @@ export default function AddCarModal({ isOpen, onClose, onSuccess, workers, onAdd
             />
           </div>
         </div>
+
+        {customerInfo && (
+          <div className={`p-4 rounded-lg border-2 ${customerInfo.isVIP ? "bg-amber-50 border-amber-300" : "bg-blue-50 border-blue-200"}`}>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                {customerInfo.isVIP ? (
+                  <Award className="w-5 h-5 text-amber-500" />
+                ) : (
+                  <User className="w-5 h-5 text-blue-500" />
+                )}
+                <span className={`font-semibold ${customerInfo.isVIP ? "text-amber-800" : "text-blue-800"}`}>
+                  {customerInfo.isVIP ? "VIP Customer!" : "Returning Customer!"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleApplyCustomerInfo}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800"
+              >
+                Auto-fill info
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-600">{customerInfo.totalVisits} visits</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-600">Last: {formatDate(customerInfo.lastVisit)}</span>
+              </div>
+              <div className="col-span-2 text-gray-600">
+                Total spent: <span className="font-semibold">{customerInfo.totalSpent} EGP</span>
+                {" • "}Favorite: <span className="font-semibold">{customerInfo.favoriteWashType}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="label flex items-center gap-2">
