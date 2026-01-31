@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { MechanicRecord } from "@prisma/client";
@@ -175,9 +175,9 @@ export default function MechanicPage() {
         <StatsCard title="Total Services" value={stats.total} icon={Wrench} color="blue" />
         <StatsCard title="Total Revenue" value={`${stats.totalRevenue} EGP`} icon={DollarSign} color="purple" />
         <StatsCard title="Oil Services" value={stats.oilServices} icon={Droplets} color="yellow" />
-        <StatsCard title="Oil Revenue" value={`${stats.oilRevenue} EGP`} icon={Droplets} color="amber" />
+        <StatsCard title="Oil Revenue" value={`${stats.oilRevenue} EGP`} icon={Droplets} color="yellow" />
         <StatsCard title="Other Services" value={stats.otherServices} icon={Settings} color="gray" />
-        <StatsCard title="Other Revenue" value={`${stats.otherRevenue} EGP`} icon={Settings} color="slate" />
+        <StatsCard title="Other Revenue" value={`${stats.otherRevenue} EGP`} icon={Settings} color="gray" />
         <StatsCard title="Received" value={`${stats.received} EGP`} icon={Check} color="green" />
       </div>
 
