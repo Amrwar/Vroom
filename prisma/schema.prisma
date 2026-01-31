@@ -10,6 +10,7 @@ datasource db {
 model Worker {
   id          String       @id @default(uuid())
   name        String       @unique
+  role        WorkerRole   @default(CARWASH)
   isActive    Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -17,6 +18,7 @@ model Worker {
 
   @@index([isActive])
   @@index([name])
+  @@index([role])
 }
 
 model WashRecord {
@@ -66,6 +68,12 @@ model MechanicRecord {
 
   @@index([createdAt])
   @@index([plateNumber])
+}
+
+enum WorkerRole {
+  CARWASH
+  MECHANIC
+  BOTH
 }
 
 enum WashType {
